@@ -1,0 +1,127 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-quality:
+    name: Python - lint, types, docstrings, tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Sync workspace
+        run: uv sync --all-packages
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Docstring coverage (interrogate)
+        run: uv run interrogate -v packages services tests
+
+      - name: Typecheck production sources
+        run: |
+          uv run mypy \
+            packages/*/src \
+            services/api/src \
+            services/agent/src \
+            services/workers/video-processing-worker/src \
+            tests
+
+      - name: Tests
+        run: uv run pytest
+
+  js-quality:
+    name: JS/TS - lint, types, docstrings, tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint (incl. JSDoc rules)
+        run: npx eslint apps/ui --no-warn-ignored --max-warnings=0
+
+      - name: Prettier check
+        run: npx prettier --check .
+
+      - name: TypeScript
+        run: npx tsc -p apps/ui --noEmit
+
+      - name: Vitest
+        run: npx vitest run --root apps/ui
+
+  dependency-policy:
+    name: Dependency policy - no agent frameworks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify no LangChain/LangGraph/LlamaIndex/CrewAI anywhere
+        run: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          echo "Scanning manifests and sources for banned frameworks..."
+          if grep -riE "langchain|langgraph|llamaindex|crewai" \
+              --include="*.toml" --include="*.json" --include="*.txt" \
+              --include="*.py" --include="*.ts" --include="*.tsx" \
+              --exclude-dir=node_modules --exclude-dir=.venv --exclude-dir=.next . ; then
+            echo "::error::Agent framework dependency detected. Via owns its harness; see docs/agent-harness.md."
+            exit 1
+          fi
+          echo "Clean: no agent framework dependencies."
+
+  docker-build:
+    name: Docker build (compose)
+    runs-on: ubuntu-latest
+    needs: [python-quality, js-quality]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build all service images
+        run: docker compose build
+
+      - name: Validate Step Functions ASL is valid JSON
+        run: python3 -c "import json; json.load(open('infrastructure/stepfunctions/video_processing.asl.json'))"
+
+  terraform-check:
+    name: Terraform fmt/validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infrastructure/terraform/environments/dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.x"
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive ../../
+
+      - name: terraform validate (no init needed for syntax-only modules)
+        run: |
+          terraform init -backend=false >/dev/null
+          terraform validate

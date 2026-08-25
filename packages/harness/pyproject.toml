@@ -1,0 +1,18 @@
+[project]
+name = "via-harness"
+version = "0.1.0"
+description = "Via-owned agent harness: model/prompt/tool/policy/runtime boundaries around the application"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pydantic>=2.9.0",
+]
+
+[project.optional-dependencies]
+bedrock = ["boto3>=1.35.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/via_harness"]

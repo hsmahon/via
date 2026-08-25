@@ -1,0 +1,14 @@
+# Summary prompt used by the media pipeline once transcripts exist (v0.2).
+name: transcript_summary
+version: 1
+environment: local
+description: Produces a concise chapter outline from a full transcript.
+template: |
+  Summarize the following transcript of video {{video_id}} into chapters.
+  Transcript:
+  {{transcript}}
+variables: [video_id, transcript]
+metadata:
+  task: summarization
+  language: en
+  owner: via-media-ingest

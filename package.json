@@ -1,0 +1,29 @@
+{
+  "name": "via-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Via - Video Intelligence Agent (JS workspace root)",
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -p apps/ui --noEmit",
+    "test": "vitest run --root apps/ui",
+    "docstrings:test": "vitest run --root apps/ui docstrings"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "eslint": "^9.18.0",
+    "eslint-plugin-jsdoc": "^50.6.1",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.20.0",
+    "vitest": "^3.0.4"
+  }
+}

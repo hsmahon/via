@@ -1,0 +1,145 @@
+{
+  "Comment": "Via video processing pipeline: transcribe then analyze, updating DynamoDB state at each step. Task resources are ${...} placeholders provisioned by Terraform in a later phase. Flow: upload -> MarkProcessing -> StartTranscription -> poll (WaitForTranscription/CheckTranscription) -> RunPegasusAnalysis -> MarkProcessed; any failure -> MarkFailed.",
+  "StartAt": "MarkProcessing",
+  "States": {
+    "MarkProcessing": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${UpdateStatusFunctionArn}",
+        "Payload": {
+          "video_id.$": "$.video_id",
+          "status": "PROCESSING"
+        }
+      },
+      "ResultPath": null,
+      "Next": "StartTranscription",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "MarkFailed",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "StartTranscription": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${StartTranscriptionFunctionArn}",
+        "Payload": {
+          "bucket.$": "$.bucket",
+          "key.$": "$.key",
+          "video_id.$": "$.video_id"
+        }
+      },
+      "ResultPath": "$.transcribe",
+      "Next": "WaitForTranscription",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "MarkFailed",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "WaitForTranscription": {
+      "Type": "Wait",
+      "Seconds": 60,
+      "Next": "CheckTranscription"
+    },
+    "CheckTranscription": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.transcribe.status",
+          "StringEquals": "COMPLETED",
+          "Next": "RunPegasusAnalysis"
+        }
+      ],
+      "Default": "RetryOrGiveUp"
+    },
+    "RetryOrGiveUp": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${PollTranscriptionFunctionArn}",
+        "Payload.$": "$"
+      },
+      "ResultPath": "$.transcribe",
+      "Next": "TranscriptionDecision",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "MarkFailed",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "TranscriptionDecision": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.transcribe.status",
+          "StringEquals": "COMPLETED",
+          "Next": "RunPegasusAnalysis"
+        }
+      ],
+      "Default": "RetryOrFinish"
+    },
+    "RetryOrFinish": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.attempt_count",
+          "NumericGreaterThan": 5,
+          "Next": "MarkFailed"
+        }
+      ],
+      "Default": "WaitForTranscription"
+    },
+    "RunPegasusAnalysis": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::bedrock:invokeModel",
+      "Parameters": {
+        "ModelId": "${PegasusModelId}",
+        "Body.$": "$"
+      },
+      "ResultPath": "$.analysis",
+      "Next": "MarkProcessed",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "MarkFailed",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "MarkProcessed": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${UpdateStatusFunctionArn}",
+        "Payload": {
+          "video_id.$": "$.video_id",
+          "status": "PROCESSED"
+        }
+      },
+      "ResultPath": null,
+      "End": true
+    },
+    "MarkFailed": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${UpdateStatusFunctionArn}",
+        "Payload": {
+          "video_id.$": "$.video_id",
+          "status": "FAILED"
+        }
+      },
+      "ResultPath": null,
+      "End": true
+    }
+  }
+}
