@@ -11,7 +11,13 @@ import jsdoc from "eslint-plugin-jsdoc";
  */
 export default tseslint.config(
   {
-    ignores: ["**/node_modules/**", "**/.next/**", "**/dist/**", "**/coverage/**"],
+    ignores: [
+      "**/node_modules/**",
+      "**/.next/**",
+      "**/dist/**",
+      "**/coverage/**",
+      "**/.venv/**",
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
