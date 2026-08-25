@@ -51,7 +51,7 @@ def _create(client: TestClient, **overrides: Any) -> dict[str, Any]:
     body: dict[str, Any] = {"filename": "clip.mp4", "duration": 10.0}
     body.update(overrides)
     response = client.post("/videos", json=body, headers=USER)
-    assert response.status_code == 201, response.text
+    assert response.status_code == 202, response.text
     return response.json()
 
 

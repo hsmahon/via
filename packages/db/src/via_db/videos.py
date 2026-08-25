@@ -41,6 +41,8 @@ class VideoRepository:
         duration: float | None = None,
         s3_bucket: str | None = None,
         s3_key: str | None = None,
+        file_size: int | None = None,
+        content_type: str | None = None,
         status: VideoStatus = VideoStatus.UPLOADING,
     ) -> VideoRecord:
         """Create a new video record with a conditional put.
@@ -52,6 +54,8 @@ class VideoRepository:
             duration: Optional duration in seconds.
             s3_bucket: Bucket that will receive the upload.
             s3_key: Object key for the upload.
+            file_size: Declared file size in bytes.
+            content_type: Declared MIME type.
             status: Initial status; ``UPLOADING`` by convention.
 
         Returns:
@@ -72,6 +76,10 @@ class VideoRepository:
             status=status,
             s3_bucket=s3_bucket,
             s3_key=s3_key,
+            file_size=file_size,
+            content_type=content_type,
+            video_name=filename,
+            upload_date=now,
             created_at=now,
             updated_at=now,
         )
@@ -203,6 +211,28 @@ class VideoRepository:
             item["video_id"] = parse_video_pk(str(item.get("pk", "")))
             records.append(VideoRecord.from_item(item))
         return records
+
+    def count_by_user(self, user_id: str) -> int:
+        """Count how many videos a user owns (for quota checks).
+
+        Args:
+            user_id: Owner identifier.
+
+        Returns:
+            Number of ``META`` items owned by the user (up to quota scale).
+
+        Note:
+            Implemented as a ``Select=COUNT`` query over ``gsi1`` so small
+            quotas stay cheap even without a separate counter item.
+        """
+        response = self._table.query(
+            IndexName="gsi1",
+            KeyConditionExpression="#p = :u",
+            ExpressionAttributeNames={"#p": "gsi1pk"},
+            ExpressionAttributeValues={":u": gsi1_pk(user_id)},
+            Select="COUNT",
+        )
+        return int(response.get("Count", 0))
 
     def append_event(
         self, video_id: str, event_type: str, payload: dict[str, Any], *, actor: str = "system"

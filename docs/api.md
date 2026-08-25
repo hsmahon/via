@@ -19,25 +19,33 @@ Base URL (local): `http://localhost:8080` · Interactive docs: `/docs`
 
 ## Videos
 
-### `POST /videos` — create upload session
+### `POST /videos` — accept a video for upload (Vertical Slice #1)
 
-Request:
+**Purpose:** admit a video for the authenticated user and return its opaque
+server-assigned identifier. The client needs the `video_id` to correlate future
+requests. Bytes are **not** proxied through the API.
+
+Request (minimal production-quality shape):
 
 ```json
 {
   "filename": "holiday.mp4",
+  "video_name": "holiday.mp4",
   "duration": 183.5,
-  "content_type": "video/mp4"
+  "content_type": "video/mp4",
+  "file_size": 104857600
 }
 ```
 
-| Field          | Type    | Rules                                     |
-| -------------- | ------- | ----------------------------------------- |
-| `filename`     | string  | required, 1-255 chars, no path separators |
-| `duration`     | float?  | > 0 when present                          |
-| `content_type` | string? | MIME hint stored for the upload           |
+| Field          | Type    | Rules                                                                 |
+| -------------- | ------- | --------------------------------------------------------------------- |
+| `filename`     | string? | preferred; 1-255 chars, no path separators                            |
+| `video_name`   | string? | alias accepted for backwards compatibility; either `filename` or `video_name` required |
+| `duration`     | float?  | > 0 when present                                                      |
+| `content_type` | string? | MIME hint; rejected with 415 when not in the configured allow-list    |
+| `file_size`    | int?    | >= 0 when present                                                     |
 
-Response `201 Created`:
+Response `202 Accepted`:
 
 ```json
 {
@@ -52,10 +60,59 @@ Response `201 Created`:
 }
 ```
 
-Upload the raw bytes with `PUT <upload.url>`; the object-created event then
-drives processing automatically.
+The `upload` presigned PUT target is attached when the deployment is configured
+to issue one; the minimal contract is `{video_id, status}` and clients must
+tolerate its absence in future configurations. When present, bytes go
+`PUT <upload.url>` directly to storage — the object-created event that drives
+`UPLOADING → PROCESSING → PROCESSED | FAILED` is **not** implemented in this slice.
 
-Errors: `409` id collision, `422` validation.
+Status codes:
+
+| Code | Meaning |
+| ---- | ------- |
+| 202  | Accepted — record written with `attribute_not_exists(pk)` guard |
+| 400  | Malformed/invalid request (e.g. path traversal in filename) |
+| 401  | Not authenticated (no `X-User-Id` and no `VIA_DEFAULT_USER_ID`) |
+| 403  | Forbidden (reserved; not used by this slice beyond route-level auth) |
+| 409  | Conflict — id collision (retry) or quota `max_videos_per_user` exceeded |
+| 415  | Unsupported media type (`content_type` not in `VIA_ALLOWED_VIDEO_CONTENT_TYPES`) |
+| 422  | Validation error from Pydantic (if schema cannot be satisfied) |
+| 500  | Unexpected server/presign failure |
+
+DynamoDB record (single table `via`, `pk=VIDEO#<id> sk=META` + `gsi1`):
+
+```
+pk              VIDEO#<video_id>
+sk              META
+gsi1pk          USER#<user_id>
+gsi1sk          <created_at>#<video_id>
+status          UPLOADING
+s3_key          videos/<user_id>/<video_id>/<filename>   (placeholder until S3 exists)
+s3_bucket       via-videos
+file_size?      int
+content_type?   string
+created_at      ISO-8601 UTC (also mirrored as upload_date / video_name for compat)
+```
+
+Requested fields and quota are in `via_api.settings.Settings`
+(`VIA_MAX_VIDEOS_PER_USER`, `VIA_ALLOWED_VIDEO_CONTENT_TYPES`).
+
+Lifecycle in this slice:
+
+```
+UPLOADING ──▶ PROCESSING ──▶ PROCESSED ──▶ DELETED
+     │             │
+     │             ▼
+     ├──▶ FAILED ◀─┘          (FAILED → DELETED allowed)
+     └────────────────────────▶ DELETED
+```
+
+Only `UPLOADING` is written by this slice. Future slices add the worker that
+moves `UPLOADING → PROCESSING → PROCESSED | FAILED`.
+
+Explicitly deferred (not in Slice #1): S3 byte handling, EventBridge/webhook
+routing, Step Functions, Transcribe, Pegasus/TwelveLabs, transcription or
+derived artifacts, and multi-agent orchestration.
 
 ### `GET /videos?limit=20`
 

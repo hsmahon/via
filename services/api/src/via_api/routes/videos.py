@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-import uuid
+import logging
 from typing import Annotated
 
+from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from via_db import (
     InvalidTransition,
-    VideoAlreadyExists,
     VideoRecord,
     VideoRepository,
 )
 
-from via_api.deps import get_presigner, get_video_repository, user_id_header
+from via_api.deps import get_presigner, get_settings, get_video_repository, user_id_header
 from via_api.schemas import (
     CreateVideoRequest,
     CreateVideoResponse,
@@ -21,7 +21,11 @@ from via_api.schemas import (
     VideoListResponse,
     VideoResponse,
 )
+from via_api.services.videos import create_video_record
+from via_api.settings import Settings
 from via_api.storage import Presigner
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/videos", tags=["videos"])
 
@@ -29,53 +33,76 @@ router = APIRouter(prefix="/videos", tags=["videos"])
 @router.post(
     "",
     response_model=CreateVideoResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Create an upload session",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Accept a video for upload",
 )
 def create_video(
     body: CreateVideoRequest,
     repo: Annotated[VideoRepository, Depends(get_video_repository)],
     presigner: Annotated[Presigner, Depends(get_presigner)],
+    settings: Annotated[Settings, Depends(get_settings)],
     user_id: Annotated[str, Depends(user_id_header)],
 ) -> CreateVideoResponse:
-    """Register a new video and hand back a presigned upload target.
+    """Create a video record in ``UPLOADING`` and return its opaque id.
 
-    The record starts in ``UPLOADING``; the storage layer's object-created
-    event drives the transition to ``PROCESSING`` once bytes land.
+    The body is validated by Pydantic, media type against the allow-list
+    and quota before any write. The row is inserted with
+    ``ConditionExpression=attribute_not_exists(pk)`` so a video_id collision
+    never silently overwrites an existing item.
+
+    In this slice the HTTP transaction ends after the conditional write.
+    Bytes are **not** proxied through the API, so the minimal response is
+    ``{video_id, status}``; a short-lived presigned PUT target is attached
+    when the deployment is configured to issue one.
 
     Args:
         body: Validated creation payload.
         repo: Video repository.
         presigner: S3 presigned-URL issuer.
+        settings: Application settings (quota + bucket).
         user_id: Acting user from the identity dependency.
 
     Returns:
-        Created session including the PUT target.
+        Acceptance payload carrying the server-generated video_id.
+
+    Raises:
+        HTTPException: 400/409/415/500 mapped from service and storage errors.
     """
-    video_id = uuid.uuid4().hex
+    # Fail-fast for empty alias without touching domain logic.
+    if not body.resolved_filename:
+        raise HTTPException(status_code=400, detail="filename (or video_name) is required")
+
     try:
-        record = repo.create(
-            video_id=video_id,
+        record, _s3_key = create_video_record(
+            body=body,
+            repo=repo,
             user_id=user_id,
-            filename=body.filename,
-            duration=body.duration,
-            s3_key=f"videos/{user_id}/{video_id}/{body.filename}",
+            settings=settings,
         )
-    except VideoAlreadyExists as exc:  # pragma: no cover - collision astronomically unlikely
-        raise HTTPException(status_code=409, detail="video id collision, retry") from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    target = presigner.create_upload_target(
-        user_id=user_id,
-        video_id=video_id,
-        filename=body.filename,
-        content_type=body.content_type,
-    )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("video create failed (DynamoDB path)")
+        raise HTTPException(status_code=500, detail="internal error") from exc
+
+    filename = body.resolved_filename
+    try:
+        target = presigner.create_upload_target(
+            user_id=user_id,
+            video_id=record.video_id,
+            filename=filename,
+            content_type=body.content_type,
+        )
+    except (ClientError, BotoCoreError, Exception) as exc:
+        logger.exception("presign failed after successful DynamoDB write")
+        raise HTTPException(status_code=500, detail="failed to issue upload target") from exc
+
+    upload = UploadTarget(**target) if target else None
     return CreateVideoResponse(
         video_id=record.video_id,
         user_id=record.user_id,
         status=record.status,
-        upload=UploadTarget(**target),
+        upload=upload,
     )
 
 

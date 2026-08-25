@@ -11,7 +11,13 @@ from via_db import VideoRepository
 from via_api.settings import Settings
 from via_api.storage import Presigner
 
-__all__ = ["get_presigner", "get_settings", "get_video_repository", "user_id_header"]
+__all__ = [
+    "get_presigner",
+    "get_settings",
+    "get_video_repository",
+    "require_user_id",
+    "user_id_header",
+]
 
 
 @lru_cache(maxsize=1)
@@ -89,11 +95,36 @@ def user_id_header(
     production replaces this dependency with the application auth layer
     without touching route bodies.
 
+    When no identity can be resolved (empty ``X-User-Id`` and no
+    ``VIA_DEFAULT_USER_ID``), a 401 is raised so tests and future auth
+    modes can assert unauthenticated behaviour without inventing a new
+    system.
+
     Args:
         settings: Application settings (default user fallback).
         x_user_id: Optional asserted identity header.
 
     Returns:
         The resolved user id.
+
+    Raises:
+        HTTPException: 401 when no identity is available.
     """
-    return x_user_id or settings.default_user_id
+    from fastapi import HTTPException
+
+    resolved = (x_user_id or settings.default_user_id or "").strip()
+    if not resolved:
+        raise HTTPException(status_code=401, detail="not authenticated")
+    return resolved
+
+
+def require_user_id(user_id: Annotated[str, Depends(user_id_header)]) -> str:
+    """Alias enforcing authentication for routes requiring identity.
+
+    Args:
+        user_id: Resolved user from :func:`user_id_header`.
+
+    Returns:
+        The authenticated user id.
+    """
+    return user_id

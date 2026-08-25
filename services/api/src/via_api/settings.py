@@ -26,6 +26,24 @@ class Settings(BaseSettings):
     s3_public_endpoint_url: str | None = None
     presign_expiry_seconds: int = 900
     default_user_id: str = "dev-user"
+    #: Maximum videos a single user may create (quota). Evaluated at write time.
+    max_videos_per_user: int = 20
+    #: Comma-separated allow-list for ``content_type``; empty allows any type.
+    allowed_video_content_types: str = (
+        "video/mp4,video/quicktime,video/mpeg"
+    )
+
+    @property
+    def allowed_content_type_set(self) -> set[str]:
+        """Parsed allow-list for video MIME types.
+
+        Returns:
+            Lower-cased set of permitted content types.
+        """
+        raw = self.allowed_video_content_types.strip()
+        if not raw:
+            return set()
+        return {item.strip().lower() for item in raw.split(",") if item.strip()}
 
     @field_validator(
         "dynamodb_endpoint_url", "s3_endpoint_url", "s3_public_endpoint_url", mode="before"

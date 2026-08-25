@@ -47,8 +47,9 @@ API reference: [api.md](api.md).
 
 ### Upload & processing
 
-1. `POST /videos` creates the record with status `UPLOADING` and returns a
-   presigned PUT URL.
+1. `POST /videos` creates the record with status `UPLOADING` and returns
+   `202 Accepted` carrying the opaque `video_id` (and, when configured, a
+   presigned PUT target — see Slice #1).
 2. The client uploads bytes directly to storage - the API never proxies media.
 3. An object-created event reaches the worker (EventBridge in production,
    MinIO webhook locally). Both are normalized onto one internal envelope.
@@ -80,7 +81,8 @@ UPLOADING ──▶ PROCESSING ──▶ PROCESSED ──▶ DELETED
 ```
 
 Transitions are enforced by an explicit table in `packages/db`; anything not
-listed raises `InvalidTransition`.
+listed raises `InvalidTransition`. Slice #1 only writes the initial
+`UPLOADING`; the remaining transitions land with the worker.
 
 ## Data model
 
@@ -93,6 +95,17 @@ Single DynamoDB table (`pk`/`sk`, GSI `gsi1`):
 | `ANALYTICS#<scope>` | `COUNTER#<name>` | counters                 |
 
 GSI: `USER#<user_id>` → `<created_at>#<video_id>` for newest-first listing.
+Slice #1 also stores the V0 `file_size`/`content_type` (when declared) and the
+placeholder `s3_key` on the `META` item.
+
+## Vertical slices
+
+- **Slice #1 — `POST /videos` (this repo):** validates the request, enforces
+  `content_type` allow-list and `max_videos_per_user` quota (409), generates
+  `video_id`, creates the `META` item with `attribute_not_exists(pk)`, sets
+  `UPLOADING`, returns `202 {video_id, status}` (plus `upload` when presigning
+  is enabled). Contract documented at [docs/architecture/api-contract.md](architecture/api-contract.md).
+  Deferred: S3 bytes, events, Step Functions, transcription, workers, agent.
 
 ## Architectural decisions
 

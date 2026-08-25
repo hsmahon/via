@@ -89,6 +89,10 @@ class VideoRecord(BaseModel):
         status: Current lifecycle state.
         s3_bucket: Bucket holding the object.
         s3_key: Object key inside the bucket.
+        file_size: Declared upload size in bytes, when known.
+        content_type: MIME type declared at creation, when known.
+        video_name: Legacy alias for filename (mirrors ``filename`` when set).
+        upload_date: Legacy alias for created_at (ISO-8601 UTC).
         created_at: ISO-8601 UTC creation timestamp.
         updated_at: ISO-8601 UTC last-update timestamp.
     """
@@ -102,6 +106,14 @@ class VideoRecord(BaseModel):
     status: VideoStatus
     s3_bucket: str | None = None
     s3_key: str | None = None
+    file_size: int | None = Field(default=None, ge=0, description="Declared file size in bytes.")
+    content_type: str | None = Field(default=None, max_length=100, description="MIME type.")
+    video_name: str | None = Field(
+        default=None, max_length=255, description="Legacy alias for filename."
+    )
+    upload_date: str | None = Field(
+        default=None, description="Legacy alias for created_at (ISO-8601 UTC)."
+    )
     created_at: str
     updated_at: str
 
