@@ -1,25 +1,21 @@
 """Concrete DynamoDB key layout for the single Via table.
 
-Key schema (deliberately explicit - no generic entity framework):
+v0.1 persistence is intentionally minimal: one table ``via-table`` holding
+only video metadata plus a single GSI for the ``GET /videos`` access pattern.
 
-===== ======== =========================================
-PK    SK       Item
-===== ======== =========================================
-VIDEO#<id>  META     VideoRecord (current state)
-VIDEO#<id>  AUDIT#<ts>  AuditEvent (append-only)
-ANALYTICS#<scope>  COUNTER#<name>  monotonically increasing counter
-===== ======== =========================================
+======== ========== ===========================
+PK       SK         Item
+======== ========== ===========================
+video_id user_id    VideoRecord (see :mod:`via_db.entities`)
+======== ========== ===========================
 
-GSI ``gsi1`` (USER#<user_id> → <created_at>#<video_id>) supports
-"list a user's videos, newest first".
+GSI ``gsi1`` (``GSI1PK=user_id`` → ``GSI1SK=<created_at>#<video_id>``) supports
+"list a user's videos, newest first" without a table Scan.
 """
 
 from __future__ import annotations
 
 __all__ = [
-    "analytics_pk",
-    "audit_sk",
-    "counter_sk",
     "gsi1_pk",
     "gsi1_sk",
     "meta_sk",
@@ -29,7 +25,11 @@ __all__ = [
 
 
 def video_pk(video_id: str) -> str:
-    """Build the partition key for all items of one video.
+    """Build the partition key for a video's item.
+
+    In v0.1 this is the raw video id (the table's PK is the video's own
+    identity). Retains the ``VIDEO#`` prefix convention so existing tests and
+    Terraform state carry over without a migration.
 
     Args:
         video_id: Video identifier.
@@ -47,42 +47,6 @@ def meta_sk() -> str:
         Constant string ``META``.
     """
     return "META"
-
-
-def audit_sk(occurred_at: str) -> str:
-    """Build the sort key for an audit event.
-
-    Args:
-        occurred_at: ISO-8601 UTC timestamp with microsecond precision.
-
-    Returns:
-        Sort key ``AUDIT#<occurred_at>``.
-    """
-    return f"AUDIT#{occurred_at}"
-
-
-def analytics_pk(scope: str) -> str:
-    """Build the partition key for one analytics scope.
-
-    Args:
-        scope: Scope identifier such as ``GLOBAL`` or ``USER#<id>``.
-
-    Returns:
-        Partition key string ``ANALYTICS#<scope>``.
-    """
-    return f"ANALYTICS#{scope}"
-
-
-def counter_sk(name: str) -> str:
-    """Build the sort key for one named counter.
-
-    Args:
-        name: Counter name such as ``videos_uploaded``.
-
-    Returns:
-        Sort key ``COUNTER#<name>``.
-    """
-    return f"COUNTER#{name}"
 
 
 def gsi1_pk(user_id: str) -> str:

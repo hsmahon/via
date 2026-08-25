@@ -50,11 +50,6 @@ def handle_object_created(
 
     try:
         repository.update_status(video_id, VideoStatus.PROCESSING)
-        repository.append_event(
-            video_id,
-            "video.processing_started",
-            {"bucket": envelope.detail.bucket, "key": envelope.detail.key},
-        )
     except VideoNotFound:
         logger.warning("event for unknown video %s ignored", video_id)
         return HandlerOutcome(status="ignored", video_id=video_id, detail="unknown video")
@@ -67,10 +62,8 @@ def handle_object_created(
             analyze_with_pegasus(bucket=envelope.detail.bucket, key=envelope.detail.key)
         except NotImplementedError as exc:
             failed = repository.update_status(video_id, VideoStatus.FAILED)
-            repository.append_event(video_id, "video.failed", {"reason": str(exc)})
             return HandlerOutcome(status="failed", video_id=failed.video_id, detail=str(exc))
 
     processed = repository.update_status(video_id, VideoStatus.PROCESSED)
-    repository.append_event(video_id, "video.processed", {})
     logger.info("video %s processed", video_id)
     return HandlerOutcome(status="processed", video_id=processed.video_id)

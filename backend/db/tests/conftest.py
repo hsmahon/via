@@ -38,33 +38,3 @@ def videos(ddb_table: Any) -> Any:
     from via_db.videos import VideoRepository
 
     return VideoRepository(ddb_table)
-
-
-@pytest.fixture()
-def audit(ddb_table: Any) -> Any:
-    """Provide an audit log over the mocked table.
-
-    Args:
-        ddb_table: Mocked DynamoDB table.
-
-    Returns:
-        :class:`AuditLog` instance.
-    """
-    from via_db.audit import AuditLog
-
-    return AuditLog(ddb_table)
-
-
-@pytest.fixture()
-def analytics(ddb_table: Any) -> Any:
-    """Provide an analytics repository over the mocked table.
-
-    Args:
-        ddb_table: Mocked DynamoDB table.
-
-    Returns:
-        :class:`AnalyticsRepository` instance.
-    """
-    from via_db.analytics import AnalyticsRepository
-
-    return AnalyticsRepository(ddb_table)

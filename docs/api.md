@@ -143,8 +143,7 @@ Fetch one video. Errors: `404`.
 
 ### `DELETE /videos/{video_id}`
 
-Soft-delete (sets status `DELETED`, writes a `video.deleted` audit event).
-Metadata is retained for auditability.
+Soft-delete (sets status `DELETED`).
 
 Errors: `403` not owner, `404` unknown, `409` already deleted/invalid state.
 

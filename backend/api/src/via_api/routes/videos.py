@@ -155,7 +155,7 @@ def delete_video(
     repo: Annotated[VideoRepository, Depends(get_video_repository)],
     user_id: Annotated[str, Depends(user_id_header)],
 ) -> VideoResponse:
-    """Move a video to ``DELETED`` and record an audit event.
+    """Move a video to ``DELETED``.
 
     Args:
         video_id: Target video.
@@ -177,7 +177,6 @@ def delete_video(
         updated = repo.soft_delete(video_id)
     except InvalidTransition as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    repo.append_event(video_id, "video.deleted", {"actor": user_id}, actor=user_id)
     return _to_response(updated)
 
 

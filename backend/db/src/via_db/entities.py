@@ -9,7 +9,7 @@ from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
-__all__ = ["ALLOWED_TRANSITIONS", "AuditEvent", "VideoRecord", "VideoStatus"]
+__all__ = ["ALLOWED_TRANSITIONS", "VideoRecord", "VideoStatus"]
 
 
 def _to_decimal(value: Any) -> Any:
@@ -56,7 +56,7 @@ class VideoStatus(StrEnum):
     ``PROCESSING`` - worker accepted the object-created event.
     ``PROCESSED``  - pipeline finished (transcripts/artifacts ready).
     ``FAILED``     - terminal failure; retry flows arrive later.
-    ``DELETED``    - soft-deleted; metadata retained for auditability.
+    ``DELETED``    - soft-deleted; status overwritten to DELETED.
     """
 
     UPLOADING = "UPLOADING"
@@ -150,24 +150,3 @@ class VideoRecord(BaseModel):
             Timestamp string with microsecond precision.
         """
         return datetime.now(UTC).isoformat()
-
-
-class AuditEvent(BaseModel):
-    """Append-only event recorded on a video's audit trail."""
-
-    model_config = ConfigDict(frozen=True)
-
-    event_type: str = Field(
-        min_length=1, description="Dotted event name such as 'video.status_changed'."
-    )
-    occurred_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
-    actor: str = Field(default="system", description="Identity that caused the event.")
-    payload: dict[str, Any] = Field(default_factory=dict)
-
-    def to_item(self) -> dict[str, Any]:
-        """Serialize into a DynamoDB item.
-
-        Returns:
-            DynamoDB-safe dictionary of the event.
-        """
-        return cast("dict[str, Any]", _to_decimal(self.model_dump(mode="json")))

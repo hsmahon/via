@@ -67,7 +67,7 @@ CI order (`ci.yml`): `python-quality` (ruff → format → interrogate → mypy 
 
 ## Architecture — non-obvious
 
-- **Single DynamoDB table** (`pk`/`sk`, `gsi1: USER#<user_id>` → `<created_at>#<video_id>`). Entities: `VIDEO#<id>/META`, `VIDEO#<id>/AUDIT#<ts>`, `ANALYTICS#<scope>/COUNTER#<name>`. Transitions enforced in `backend/db` — invalid → `InvalidTransition`.
+- **Single DynamoDB table** (`pk`/`sk`, `gsi1: USER#<user_id>` → `<created_at>#<video_id>`). Single `via-table` contract: `VIDEO#<id>/META` only; GSI `gsi1` serves `GET /videos`. Transitions enforced in `backend/db` — invalid → `InvalidTransition`.
 - **Status lifecycle**: `UPLOADING → PROCESSING → PROCESSED → DELETED`; `UPLOADING/PROCESSING → FAILED → DELETED` (see `docs/architecture.md`).
 - **Upload is direct browser→S3** via presigned PUT; API never proxies bytes.
 - **Object-created event** normalized to one envelope: locally MinIO webhook `POST /events/minio` on `worker:8082` (prod: S3 → EventBridge → Step Functions). `dynamodb-local` started with `-sharedDb -inMemory`; `dynamodb-init` runs `via_db.bootstrap`, `minio-init` creates bucket + webhook.

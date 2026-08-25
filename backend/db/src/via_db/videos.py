@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from via_db.entities import ALLOWED_TRANSITIONS, VideoRecord, VideoStatus
 from via_db.errors import InvalidTransition, VideoAlreadyExists, VideoNotFound
-from via_db.keys import audit_sk, gsi1_pk, gsi1_sk, meta_sk, parse_video_pk, video_pk
+from via_db.keys import gsi1_pk, gsi1_sk, meta_sk, parse_video_pk, video_pk
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from mypy_boto3_dynamodb.service_resource import Table
@@ -18,13 +18,17 @@ _SAFE_FILENAME = re.compile(r"^[^/\\]{1,255}$")
 
 
 class VideoRepository:
-    """Data access for video records and their audit trails."""
+    """Persistence for video records in the single ``via-table``.
+
+    The repository owns only DynamoDB I/O and domain invariants. It knows
+    nothing about HTTP, FastAPI, agents or workers.
+    """
 
     def __init__(self, table: Table) -> None:
         """Initialize the repository.
 
         Args:
-            table: DynamoDB table handle (single-table layout).
+            table: DynamoDB table handle (``via-table`` contract).
         """
         self._table = table
 
@@ -233,21 +237,3 @@ class VideoRepository:
             Select="COUNT",
         )
         return int(response.get("Count", 0))
-
-    def append_event(
-        self, video_id: str, event_type: str, payload: dict[str, Any], *, actor: str = "system"
-    ) -> None:
-        """Append one audit event under the video's partition.
-
-        Args:
-            video_id: Owning video.
-            event_type: Dotted event name.
-            payload: JSON-safe structured details.
-            actor: Identity causing the event.
-        """
-        from via_db.entities import AuditEvent
-
-        event = AuditEvent(event_type=event_type, payload=payload, actor=actor)
-        self._table.put_item(
-            Item={"pk": video_pk(video_id), "sk": audit_sk(event.occurred_at), **event.to_item()}
-        )

@@ -1,4 +1,4 @@
-"""Video repository and lifecycle tests."""
+"""Video repository and lifecycle tests (v0.1: single via-table, no audit/analytics)."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ class TestKeys:
     def test_parse_rejects_foreign_pk(self) -> None:
         """Non-video partition keys are rejected loudly."""
         with pytest.raises(ValueError):
-            parse_video_pk("ANALYTICS#GLOBAL")
+            parse_video_pk("USER#u1")
 
 
 class TestVideoLifecycle:
@@ -38,6 +38,27 @@ class TestVideoLifecycle:
         assert fetched == record
         assert fetched is not None
         assert fetched.status is VideoStatus.UPLOADING
+
+    def test_create_writes_to_via_table_only(self, ddb_table, videos) -> None:  # type: ignore[no-untyped-def]
+        """Creation writes exactly one META item to via-table."""
+        videos.create(video_id="only-meta", user_id="u1", filename="a.mp4")
+        items = list(ddb_table.scan().get("Items", []))
+        # Only the META item; no AUDIT# or ANALYTICS# rows.
+        assert len(items) == 1
+        item = items[0]
+        assert item["sk"] == "META"
+        assert item["pk"] == video_pk("only-meta")
+        assert item["status"] == VideoStatus.UPLOADING.value
+
+    def test_duplicate_create_does_not_overwrite(self, videos, ddb_table) -> None:  # type: ignore[no-untyped-def]
+        """Id collisions raise and do not mutate the original row."""
+        original = videos.create(video_id="dup2", user_id="u1", filename="a.mp4")
+        with pytest.raises(VideoAlreadyExists):
+            videos.create(video_id="dup2", user_id="u2", filename="b.mp4")
+        fetched = videos.get("dup2")
+        assert fetched == original
+        assert fetched.user_id == "u1"
+        assert fetched.filename == "a.mp4"
 
     def test_get_missing_returns_none(self, videos) -> None:  # type: ignore[no-untyped-def]
         """Unknown ids return None instead of raising."""
@@ -60,6 +81,15 @@ class TestVideoLifecycle:
         videos.create(video_id="newer", user_id="u1", filename="new.mp4")
         listed = videos.list_by_user("u1")
         assert [r.video_id for r in listed] == ["newer", "older"]
+
+    def test_list_by_user_uses_gsi(self, videos) -> None:  # type: ignore[no-untyped-def]
+        """GSI query returns only the requesting user's videos."""
+        videos.create(video_id="v-a", user_id="alice", filename="a.mp4")
+        videos.create(video_id="v-b", user_id="bob", filename="b.mp4")
+        alice = videos.list_by_user("alice")
+        bob = videos.list_by_user("bob")
+        assert [r.video_id for r in alice] == ["v-a"]
+        assert [r.video_id for r in bob] == ["v-b"]
 
     def test_happy_path_transitions(self, videos) -> None:  # type: ignore[no-untyped-def]
         """UPLOADING → PROCESSING → PROCESSED is permitted end-to-end."""
@@ -88,6 +118,19 @@ class TestVideoLifecycle:
         with pytest.raises(InvalidTransition):
             videos.soft_delete("del")
 
+    def test_delete_sets_status_without_audit_side_effects(self, videos, ddb_table) -> None:  # type: ignore[no-untyped-def]
+        """Soft-delete flips status to DELETED and writes no audit rows."""
+        videos.create(video_id="del2", user_id="u1", filename="d2.mp4")
+        videos.soft_delete("del2")
+        fetched = videos.get("del2")
+        assert fetched is not None
+        assert fetched.status is VideoStatus.DELETED
+        items = list(ddb_table.scan().get("Items", []))
+        # One META item, no AUDIT# rows.
+        assert len(items) == 1
+        assert items[0]["status"] == VideoStatus.DELETED.value
+        assert not any(str(i.get("sk", "")).startswith("AUDIT#") for i in items)
+
     def test_failed_is_terminal_except_delete(self, videos) -> None:  # type: ignore[no-untyped-def]
         """FAILED allows no further transitions except deletion."""
         videos.create(video_id="fail", user_id="u1", filename="x.mp4")
@@ -96,29 +139,6 @@ class TestVideoLifecycle:
         with pytest.raises(InvalidTransition):
             videos.update_status("fail", VideoStatus.PROCESSING)
         assert videos.soft_delete("fail").status is VideoStatus.DELETED
-
-
-class TestAuditAndAnalytics:
-    """Event trail and counter behavior."""
-
-    def test_append_and_read_audit_events(self, videos, audit) -> None:  # type: ignore[no-untyped-def]
-        """Appended events are readable newest-first under the video."""
-        videos.create(video_id="aud", user_id="u1", filename="a.mp4")
-        videos.append_event("aud", "video.created", {"by": "api"}, actor="user-1")
-        videos.append_event("aud", "video.status_changed", {"to": "PROCESSING"})
-        events = audit.list_for_video("aud")
-        assert len(events) == 2
-        assert events[0]["event_type"] == "video.status_changed"
-        assert events[0]["sk"].startswith("AUDIT#")
-
-    def test_analytics_counters_accumulate(self, analytics) -> None:  # type: ignore[no-untyped-def]
-        """Increment accumulates per scope/counter atomically enough for v0.1."""
-        analytics.increment(counter="videos_uploaded")
-        analytics.increment(scope="USER#u1", counter="videos_uploaded", amount=3)
-        analytics.increment(scope="USER#u1", counter="videos_uploaded")
-        assert analytics.get(counter="videos_uploaded") == 1
-        assert analytics.get(scope="USER#u1", counter="videos_uploaded") == 4
-        assert analytics.get(counter="never_touched") == 0
 
 
 class TestEntityModel:
@@ -137,6 +157,17 @@ class TestEntityModel:
         )
         restored = VideoRecord.from_item(record.to_item())
         assert restored == record
+
+    def test_no_audit_or_analytics_records_created(self, ddb_table, videos) -> None:  # type: ignore[no-untyped-def]
+        """Lifecycle ops never leave ANALYTICS# or AUDIT# rows."""
+        videos.create(video_id="clean", user_id="u1", filename="c.mp4")
+        videos.update_status("clean", VideoStatus.PROCESSING)
+        videos.update_status("clean", VideoStatus.PROCESSED)
+        items = list(ddb_table.scan().get("Items", []))
+        for item in items:
+            assert not str(item.get("pk", "")).startswith("ANALYTICS#")
+            assert not str(item.get("sk", "")).startswith("AUDIT#")
+            assert not str(item.get("sk", "")).startswith("COUNTER#")
 
     def test_via_db_error_hierarchy(self) -> None:
         """All repository errors share the ViaDbError base."""

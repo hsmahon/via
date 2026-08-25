@@ -19,7 +19,7 @@ flowchart TB
     API <-->|state| DDB
 
     S3 -->|"object created event\n(EventBridge in prod,\nwebhook locally)"| Worker["video-processing-worker"]
-    Worker <-->|state transitions + audit| DDB
+    Worker <-->|state transitions| DDB
     Worker -.->|v0.2: Transcribe| T[Amazon Transcribe]
     Worker -.->|v0.2: Pegasus| P[TwelveLabs Pegasus\nvia Amazon Bedrock]
 
@@ -55,8 +55,7 @@ API reference: [api.md](api.md).
    MinIO webhook locally). Both are normalized onto one internal envelope.
 4. The worker validates ownership of the event, moves the video
    `UPLOADING → PROCESSING`, runs (future) Transcribe/Pegasus hooks, and
-   finishes at `PROCESSED` or `FAILED`. Every transition writes an audit
-   event; analytics counters increment per scope.
+   finishes at `PROCESSED` or `FAILED`.
 
 ### Agent interaction
 
@@ -86,15 +85,13 @@ listed raises `InvalidTransition`. Slice #1 only writes the initial
 
 ## Data model
 
-Single DynamoDB table (`pk`/`sk`, GSI `gsi1`):
+Single DynamoDB table `via-table` contract (`pk`/`sk`, GSI `gsi1`):
 
-| PK                  | SK               | Content                  |
-| ------------------- | ---------------- | ------------------------ |
-| `VIDEO#<id>`        | `META`           | current video state      |
-| `VIDEO#<id>`        | `AUDIT#<ts>`     | append-only audit events |
-| `ANALYTICS#<scope>` | `COUNTER#<name>` | counters                 |
+| PK           | SK     | Content             |
+| ------------ | ------ | ------------------- |
+| `VIDEO#<id>` | `META` | current video state |
 
-GSI: `USER#<user_id>` → `<created_at>#<video_id>` for newest-first listing.
+GSI `gsi1` (`USER#<user_id>` → `<created_at>#<video_id>`) supports `GET /videos` for the authenticated user without a table Scan.
 Slice #1 also stores the V0 `file_size`/`content_type` (when declared) and the
 placeholder `s3_key` on the `META` item.
 

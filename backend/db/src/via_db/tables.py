@@ -1,4 +1,4 @@
-"""Single-table definition shared by bootstrap, tests and Terraform parity."""
+"""Single DynamoDB table for v0.1: ``via-table`` with the user-videos GSI."""
 
 from __future__ import annotations
 

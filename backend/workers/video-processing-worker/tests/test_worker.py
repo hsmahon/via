@@ -124,7 +124,7 @@ class TestWorkerEndpoints:
         assert client.get("/health").json()["status"] == "ok"
 
     def test_object_created_processes_video(self, seeded: tuple[Any, Any]) -> None:
-        """UPLOADING → PROCESSING → PROCESSED with audit trail written."""
+        """UPLOADING → PROCESSING → PROCESSED."""
         repo, vid = seeded
         app = create_app(WorkerSettings(table_name="ignored"))
         app.dependency_overrides.clear()
