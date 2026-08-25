@@ -58,16 +58,16 @@ Clients must tolerate its absence.
 
 ## Status codes
 
-| Code | Condition |
-| ---- | --------- |
-| 202 | Created with conditional write |
-| 400 | Malformed / invalid request (e.g. missing name, path traversal) |
-| 401 | Not authenticated |
-| 403 | Reserved (route-level auth; not used by creation beyond identity) |
-| 409 | Quota exceeded or id collision (retry) |
-| 415 | Unsupported media type |
-| 422 | Pydantic validation (fallback) |
-| 500 | Unexpected DynamoDB/presign failure |
+| Code | Condition                                                         |
+| ---- | ----------------------------------------------------------------- |
+| 202  | Created with conditional write                                    |
+| 400  | Malformed / invalid request (e.g. missing name, path traversal)   |
+| 401  | Not authenticated                                                 |
+| 403  | Reserved (route-level auth; not used by creation beyond identity) |
+| 409  | Quota exceeded or id collision (retry)                            |
+| 415  | Unsupported media type                                            |
+| 422  | Pydantic validation (fallback)                                    |
+| 500  | Unexpected DynamoDB/presign failure                               |
 
 ## DynamoDB
 
@@ -102,7 +102,7 @@ UPLOADING → PROCESSING → PROCESSED → DELETED
 ```
 
 Slice #1 only writes `UPLOADING`. Transitions are enforced by
-`packages/db/src/via_db/entities.py::ALLOWED_TRANSITIONS`.
+`backend/db/src/via_db/entities.py::ALLOWED_TRANSITIONS`.
 
 ## Explicitly deferred
 
@@ -112,11 +112,11 @@ indexing, multi-agent flows, UI changes.
 
 ## Separation of concerns
 
-- `services/api/src/via_api/routes/videos.py` — HTTP (202, error mapping, presign orchestration).
-- `services/api/src/via_api/schemas.py` — request/response shape + alias.
-- `services/api/src/via_api/services/videos.py` — business rules (MIME + quota + write ordering).
-- `packages/db/src/via_db/videos.py` — repository (conditional put, `count_by_user`).
-- `services/api/src/via_api/settings.py` — config (`max_videos_per_user`, allow-list).
-- `services/api/src/via_api/deps.py` — auth seam (401 when identity absent).
+- `backend/api/src/via_api/routes/videos.py` — HTTP (202, error mapping, presign orchestration).
+- `backend/api/src/via_api/schemas.py` — request/response shape + alias.
+- `backend/api/src/via_api/services/videos.py` — business rules (MIME + quota + write ordering).
+- `backend/db/src/via_db/videos.py` — repository (conditional put, `count_by_user`).
+- `backend/api/src/via_api/settings.py` — config (`max_videos_per_user`, allow-list).
+- `backend/api/src/via_api/deps.py` — auth seam (401 when identity absent).
 
 No LangChain/EventBridge/worker code introduced.

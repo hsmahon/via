@@ -37,13 +37,13 @@ Request (minimal production-quality shape):
 }
 ```
 
-| Field          | Type    | Rules                                                                 |
-| -------------- | ------- | --------------------------------------------------------------------- |
-| `filename`     | string? | preferred; 1-255 chars, no path separators                            |
+| Field          | Type    | Rules                                                                                  |
+| -------------- | ------- | -------------------------------------------------------------------------------------- |
+| `filename`     | string? | preferred; 1-255 chars, no path separators                                             |
 | `video_name`   | string? | alias accepted for backwards compatibility; either `filename` or `video_name` required |
-| `duration`     | float?  | > 0 when present                                                      |
-| `content_type` | string? | MIME hint; rejected with 415 when not in the configured allow-list    |
-| `file_size`    | int?    | >= 0 when present                                                     |
+| `duration`     | float?  | > 0 when present                                                                       |
+| `content_type` | string? | MIME hint; rejected with 415 when not in the configured allow-list                     |
+| `file_size`    | int?    | >= 0 when present                                                                      |
 
 Response `202 Accepted`:
 
@@ -68,16 +68,16 @@ tolerate its absence in future configurations. When present, bytes go
 
 Status codes:
 
-| Code | Meaning |
-| ---- | ------- |
-| 202  | Accepted — record written with `attribute_not_exists(pk)` guard |
-| 400  | Malformed/invalid request (e.g. path traversal in filename) |
-| 401  | Not authenticated (no `X-User-Id` and no `VIA_DEFAULT_USER_ID`) |
-| 403  | Forbidden (reserved; not used by this slice beyond route-level auth) |
-| 409  | Conflict — id collision (retry) or quota `max_videos_per_user` exceeded |
+| Code | Meaning                                                                          |
+| ---- | -------------------------------------------------------------------------------- |
+| 202  | Accepted — record written with `attribute_not_exists(pk)` guard                  |
+| 400  | Malformed/invalid request (e.g. path traversal in filename)                      |
+| 401  | Not authenticated (no `X-User-Id` and no `VIA_DEFAULT_USER_ID`)                  |
+| 403  | Forbidden (reserved; not used by this slice beyond route-level auth)             |
+| 409  | Conflict — id collision (retry) or quota `max_videos_per_user` exceeded          |
 | 415  | Unsupported media type (`content_type` not in `VIA_ALLOWED_VIDEO_CONTENT_TYPES`) |
-| 422  | Validation error from Pydantic (if schema cannot be satisfied) |
-| 500  | Unexpected server/presign failure |
+| 422  | Validation error from Pydantic (if schema cannot be satisfied)                   |
+| 500  | Unexpected server/presign failure                                                |
 
 DynamoDB record (single table `via`, `pk=VIDEO#<id> sk=META` + `gsi1`):
 

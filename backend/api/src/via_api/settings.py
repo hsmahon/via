@@ -29,9 +29,7 @@ class Settings(BaseSettings):
     #: Maximum videos a single user may create (quota). Evaluated at write time.
     max_videos_per_user: int = 20
     #: Comma-separated allow-list for ``content_type``; empty allows any type.
-    allowed_video_content_types: str = (
-        "video/mp4,video/quicktime,video/mpeg"
-    )
+    allowed_video_content_types: str = "video/mp4,video/quicktime,video/mpeg"
 
     @property
     def allowed_content_type_set(self) -> set[str]:

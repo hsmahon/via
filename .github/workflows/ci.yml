@@ -32,15 +32,19 @@ jobs:
         run: uv run ruff format --check .
 
       - name: Docstring coverage (interrogate)
-        run: uv run interrogate -v packages services tests
+        run: uv run interrogate -v backend tests
 
       - name: Typecheck production sources
         run: |
           uv run mypy \
-            packages/*/src \
-            services/api/src \
-            services/agent/src \
-            services/workers/video-processing-worker/src \
+            backend/db/src \
+            backend/api/src \
+            backend/agent/harness/src \
+            backend/agent/observability/src \
+            backend/agent/prompts/src \
+            backend/agent/tools/src \
+            backend/agent/service/src \
+            backend/workers/video-processing-worker/src \
             tests
 
       - name: Tests
@@ -61,16 +65,16 @@ jobs:
         run: npm ci
 
       - name: ESLint (incl. JSDoc rules)
-        run: npx eslint apps/ui --no-warn-ignored --max-warnings=0
+        run: npx eslint frontend/ui --no-warn-ignored --max-warnings=0
 
       - name: Prettier check
         run: npx prettier --check .
 
       - name: TypeScript
-        run: npx tsc -p apps/ui --noEmit
+        run: npx tsc -p frontend/ui --noEmit
 
       - name: Vitest
-        run: npx vitest run --root apps/ui
+        run: npx vitest run --root frontend/ui
 
   dependency-policy:
     name: Dependency policy - no agent frameworks

@@ -31,7 +31,7 @@ from via_agent.settings import Settings
 __all__ = ["ServiceContext", "build_authorization_context", "build_context"]
 
 _PROMPTS_DIR = (
-    Path(__file__).resolve().parents[4] / "packages" / "prompts" / "src" / "via_prompts" / "prompts"
+    Path(__file__).resolve().parents[4] / "agent" / "prompts" / "src" / "via_prompts" / "prompts"
 )
 
 
@@ -209,7 +209,7 @@ def _prompts_root() -> Path:
         Directory containing ``<name>/v<version>.yaml`` files.
     """
     candidates = [
-        Path.cwd() / "packages" / "prompts" / "src" / "via_prompts" / "prompts",
+        Path.cwd() / "backend" / "agent" / "prompts" / "src" / "via_prompts" / "prompts",
         _PROMPTS_DIR,
         Path(__file__).resolve().parent.parent / "prompts",  # installed wheel layout
         Path("/app/prompts"),

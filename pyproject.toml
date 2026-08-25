@@ -9,7 +9,7 @@ requires-python = ">=3.12,<3.13"
 package = false
 
 [tool.uv.workspace]
-members = ["packages/*", "services/api", "services/agent", "services/workers/*"]
+members = ["backend/db", "backend/api", "backend/agent/*", "backend/workers/*"]
 
 [dependency-groups]
 dev = [
@@ -30,13 +30,13 @@ dev = [
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-src = ["packages", "services", "tests"]
+src = ["backend", "tests"]
 extend-exclude = [".venv", "node_modules"]
 
 [tool.ruff.lint.per-file-ignores]
 # FastAPI dependency injection requires call expressions in defaults.
-"services/agent/src/via_agent/main.py" = ["B008"]
-"services/workers/video-processing-worker/src/via_worker_video_processing/main.py" = ["B008"]
+"backend/agent/service/src/via_agent/main.py" = ["B008"]
+"backend/workers/video-processing-worker/src/via_worker_video_processing/main.py" = ["B008"]
 
 [tool.ruff.lint]
 select = [
@@ -85,8 +85,7 @@ ignore_missing_imports = true
 # fixture-driven pragmatism (documented in docs/local-development.md).
 [[tool.mypy.overrides]]
 module = [
-    "packages.*.tests", "packages.*.tests.*",
-    "services.*.tests", "services.*.tests.*",
+    "backend.*.tests", "backend.*.tests.*",
 ]
 disallow_untyped_defs = false
 warn_return_any = false
@@ -96,7 +95,7 @@ disable_error_code = ["no-any-return", "arg-type", "assignment", "union-attr", "
 # pytest (run from repo root; covers every package/service)
 # ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
-testpaths = ["packages", "services", "services/workers", "tests"]
+testpaths = ["backend", "tests"]
 addopts = "-q --strict-markers --strict-config --import-mode=importlib"
 markers = [
     "docstring: meta-tests that enforce docstring presence/validity across the codebase",
@@ -120,4 +119,4 @@ verbose = 1
 # coverage
 # ---------------------------------------------------------------------------
 [tool.coverage.run]
-source = ["packages", "services"]
+source = ["backend"]

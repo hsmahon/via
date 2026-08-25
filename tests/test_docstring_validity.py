@@ -15,8 +15,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 SOURCE_ROOTS = [
-    REPO_ROOT / "packages",
-    REPO_ROOT / "services",
+    REPO_ROOT / "backend",
 ]
 _EXCLUDED_DIR_NAMES = {"__pycache__", ".venv", "node_modules", ".next"}
 

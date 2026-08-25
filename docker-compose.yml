@@ -6,7 +6,7 @@ name: via
 
 x-python-build: &python-build
   context: .
-  dockerfile: services/Dockerfile.python
+  dockerfile: backend/Dockerfile.python
 
 services:
   # ------------------------------------------------------------------
@@ -33,7 +33,7 @@ services:
     entrypoint: >
       sh -c "
         uv venv /opt/venv >/dev/null 2>&1 || true &&
-        uv pip install --python /opt/venv/bin/python --quiet boto3 pydantic ./packages/db &&
+        uv pip install --python /opt/venv/bin/python --quiet boto3 pydantic ./backend/db &&
         /opt/venv/bin/python -m via_db.bootstrap"
     restart: "no"
 
@@ -156,7 +156,7 @@ services:
   ui:
     build:
       context: .
-      dockerfile: apps/ui/Dockerfile
+      dockerfile: frontend/ui/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
     ports:

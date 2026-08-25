@@ -24,7 +24,7 @@ prompt_version: video_assistant@1
 model: local # or bedrock/<pegasus-id>
 input:
   message: "How long is this video?"
-  video_fixture: short-clip # seeded via packages/db fixtures
+  video_fixture: short-clip # seeded via backend/db fixtures
 expect:
   tools_called: [get_video_metadata]
   answer_contains: ["duration"]

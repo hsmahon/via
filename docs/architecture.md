@@ -80,7 +80,7 @@ UPLOADING ──▶ PROCESSING ──▶ PROCESSED ──▶ DELETED
      └────────────────────────▶ DELETED
 ```
 
-Transitions are enforced by an explicit table in `packages/db`; anything not
+Transitions are enforced by an explicit table in `backend/db`; anything not
 listed raises `InvalidTransition`. Slice #1 only writes the initial
 `UPLOADING`; the remaining transitions land with the worker.
 

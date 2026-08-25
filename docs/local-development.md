@@ -100,5 +100,5 @@ All use the `VIA_` prefix; see `.env.example`. Key ones:
 All unit/integration tests run offline: moto emulates DynamoDB/S3,
 `LocalModelClient` replaces Bedrock, and prompt resolution uses the packaged
 YAML files. See the ten harness test areas in
-`packages/harness/tests/` covering prompt resolution through structured
+`backend/agent/harness/tests/` covering prompt resolution through structured
 response validation.

@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Via - Video Intelligence Agent (JS workspace root)",
   "workspaces": [
-    "apps/*"
+    "frontend/*"
   ],
   "engines": {
     "node": ">=22"
@@ -13,9 +13,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc -p apps/ui --noEmit",
-    "test": "vitest run --root apps/ui",
-    "docstrings:test": "vitest run --root apps/ui docstrings"
+    "typecheck": "tsc -p frontend/ui --noEmit",
+    "test": "vitest run --root frontend/ui",
+    "docstrings:test": "vitest run --root frontend/ui docstrings"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

@@ -29,7 +29,7 @@ open, as an architectural change.
 
 ## 2. What the harness is responsible for
 
-Everything below lives in `packages/harness` (`via_harness`) behind ports:
+Everything below lives in `backend/agent/harness` (`via_harness`) behind ports:
 
 | #   | Responsibility             | Where                        | Port / implementation                        |
 | --- | -------------------------- | ---------------------------- | -------------------------------------------- |
@@ -76,7 +76,7 @@ Via owns, permanently, regardless of backend:
 4. The **wire contract** between model output and the application
    (`response.py`): one JSON object per turn, either a `tool_request` or a
    validated `final` payload with citations scoped to the authorized video.
-5. Domain tools themselves (`packages/tools`): `get_video_metadata`,
+5. Domain tools themselves (`backend/agent/tools`): `get_video_metadata`,
    `get_transcript`, `analyze_video`.
 
 ## 5. Tool lifecycle
@@ -92,14 +92,14 @@ flowchart LR
     invoke --> trace[Record span\nstatus + latency]
 ```
 
-Adding a tool = new class in `packages/tools/implementations/` with a
+Adding a tool = new class in `backend/agent/tools/implementations/` with a
 `ToolContract`, registered in `build_default_registry`. Nothing else changes.
 
 ## 6. Prompt lifecycle
 
 Prompts are immutable `(name, version, environment)` triples:
 
-1. **Author** edits YAML under `packages/prompts/src/via_prompts/prompts/<name>/v<N>.yaml`.
+1. **Author** edits YAML under `backend/agent/prompts/src/via_prompts/prompts/<name>/v<N>.yaml`.
 2. **Resolve** at run time through `PromptResolver`; the resolved version is
    stamped onto every trace.
 3. **Render** validates declared variables; missing/unexpected variables fail
@@ -152,12 +152,12 @@ citations are validated against the authorized video id too.
 | `Tracer`             | `LocalTracer` (memory + structured logs)       | AgentCore Observability / CloudWatch exporter           |
 | `VideoAccessChecker` | same                                           | same (DynamoDB ownership lookup)                        |
 
-Selection happens in one place only: `services/agent/wiring.py`. Everything
+Selection happens in one place only: `backend/agent/service/wiring.py`. Everything
 above `AgentRunner.execute()` is identical everywhere.
 
 ## 10. How a new tool is added
 
-1. Create `packages/tools/src/via_tools/implementations/<name>.py`:
+1. Create `backend/agent/tools/src/via_tools/implementations/<name>.py`:
 
 ```python
 class MyInput(BaseModel):

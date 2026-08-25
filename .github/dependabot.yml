@@ -19,6 +19,6 @@ updates:
       interval: weekly
 
   - package-ecosystem: docker
-    directory: apps/ui
+    directory: frontend/ui
     schedule:
       interval: weekly

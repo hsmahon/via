@@ -26,7 +26,7 @@ format: ## Auto-format Python (ruff) and JS/TS (prettier)
 	npm run format
 
 typecheck: ## Run mypy (production sources + meta-tests) and tsc
-	uv run mypy packages/*/src services/api/src services/agent/src services/workers/video-processing-worker/src tests
+	uv run mypy backend/db/src backend/api/src backend/agent/harness/src backend/agent/observability/src backend/agent/prompts/src backend/agent/tools/src backend/agent/service/src backend/workers/video-processing-worker/src tests
 	npm run typecheck
 
 test: ## Run pytest and vitest
@@ -34,7 +34,7 @@ test: ## Run pytest and vitest
 	npm test
 
 docstrings: ## Enforce docstring presence/style (interrogate + docstring tests + eslint JSDoc)
-	uv run interrogate -v packages services tests
+	uv run interrogate -v backend tests
 	uv run pytest tests/test_docstrings.py tests/test_docstring_validity.py -m docstring
 	npm run docstrings:test
 
@@ -50,5 +50,5 @@ logs: ## Tail logs from all services
 	docker compose logs -f --tail=100
 
 clean: ## Remove caches and build artifacts
-	rm -rf .pytest_cache .mypy_cache .ruff_cache .venv apps/ui/.next apps/ui/node_modules node_modules
+	rm -rf .pytest_cache .mypy_cache .ruff_cache .venv frontend/ui/.next frontend/ui/node_modules node_modules
 	find . -type d -name __pycache__ -exec rm -rf {} +
