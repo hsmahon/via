@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 from via_observability import RequestContextMiddleware, configure_logging
 
-from via_worker_video_processing.envelope import normalize_event
+from via_worker_video_processing.events import parse_eventbridge_event
 from via_worker_video_processing.handlers import HandlerOutcome, handle_object_created
 from via_worker_video_processing.settings import WorkerSettings
 
@@ -79,10 +79,10 @@ def create_app(settings: WorkerSettings | None = None) -> FastAPI:
 
     @router.post("/events")
     def receive_event(payload: dict[str, Any], repository: Any = Depends(repo)) -> HandlerOutcome:
-        """Accept an EventBridge-shaped lifecycle event.
+        """Accept an EventBridge S3 Object Created event.
 
         Args:
-            payload: Raw event JSON.
+            payload: Raw EventBridge event JSON.
             repository: Video repository.
 
         Returns:
@@ -97,10 +97,13 @@ def create_app(settings: WorkerSettings | None = None) -> FastAPI:
     def receive_minio_event(
         payload: dict[str, Any], repository: Any = Depends(repo)
     ) -> HandlerOutcome:
-        """Accept a raw MinIO bucket notification (local development).
+        """Accept an S3 event via the local MinIO compatibility route.
+
+        Local MinIO webhooks should send the EventBridge shape; MinIO-native
+        ``Records``/flat shapes are rejected as malformed (400).
 
         Args:
-            payload: MinIO notification JSON.
+            payload: EventBridge-shaped JSON.
             repository: Video repository.
 
         Returns:
@@ -112,29 +115,30 @@ def create_app(settings: WorkerSettings | None = None) -> FastAPI:
         return _process(payload, repository)
 
     def _process(payload: dict[str, Any], repository: Any) -> HandlerOutcome:
-        """Normalize and handle one event payload.
+        """Validate an EventBridge payload and handle the object-created event.
 
         Args:
-            payload: Raw event JSON from any supported source.
+            payload: Raw EventBridge event JSON.
             repository: Video repository.
 
         Returns:
             Handler outcome.
 
         Raises:
-            HTTPException: 400 when normalization fails.
+            HTTPException: 400 when validation fails.
         """
         try:
-            envelope = normalize_event(payload)
+            event = parse_eventbridge_event(payload)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         outcome = handle_object_created(
-            envelope,
+            bucket=event.detail.bucket,
+            key=event.detail.key,
             repository=repository,
             hooks_enabled=resolved.processing_hooks_enabled,
         )
         logging.getLogger("via.worker").info(
-            "event handled: %s key=%s", outcome.status, envelope.detail.key
+            "event handled: %s key=%s", outcome.status, event.detail.key
         )
         return outcome
 

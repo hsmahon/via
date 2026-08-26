@@ -10,6 +10,7 @@ package = false
 
 [tool.uv.workspace]
 members = ["backend/db", "backend/api", "backend/agent/*", "backend/workers/*"]
+exclude = ["backend/agent/evaluations"]
 
 [dependency-groups]
 dev = [
