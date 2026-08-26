@@ -332,7 +332,9 @@ class TestWorkerEndpoints:
         repo, _ = seeded
         from via_worker_video_processing.handlers import handle_object_created
 
-        outcome = handle_object_created(bucket="via-videos", key="other/prefix/file.mp4", repository=repo)
+        outcome = handle_object_created(
+            bucket="via-videos", key="other/prefix/file.mp4", repository=repo
+        )
         assert outcome.status == "ignored"
         assert outcome.video_id is None
 
