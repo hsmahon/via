@@ -102,6 +102,50 @@ class VideoRepository:
             raise VideoAlreadyExists(video_id) from exc
         return record
 
+    def mark_processing(self, video_id: str) -> VideoRecord:
+        """Atomically transition ``UPLOADING → PROCESSING``.
+
+        Performs a single DynamoDB ``UpdateItem`` with
+        ``ConditionExpression status = UPLOADING`` so the read and write
+        are not interleaved. Duplicate deliveries after the transition
+        fail the condition and are surfaced as :class:`InvalidTransition`
+        for the caller to treat as idempotent.
+
+        Args:
+            video_id: Target video.
+
+        Returns:
+            The updated record with status ``PROCESSING``.
+
+        Raises:
+            VideoNotFound: Unknown video.
+            InvalidTransition: Not currently ``UPLOADING``.
+        """
+        now = VideoRecord.now_iso()
+        try:
+            response = self._table.update_item(
+                Key={"pk": video_pk(video_id), "sk": meta_sk()},
+                UpdateExpression="SET #s = :to, #u = :now",
+                ConditionExpression="#s = :expected",
+                ExpressionAttributeNames={"#s": "status", "#u": "updated_at"},
+                ExpressionAttributeValues={
+                    ":to": VideoStatus.PROCESSING.value,
+                    ":now": now,
+                    ":expected": VideoStatus.UPLOADING.value,
+                },
+                ReturnValues="ALL_NEW",
+            )
+        except self._table.meta.client.exceptions.ConditionalCheckFailedException as exc:
+            current_record = self.get(video_id)
+            if current_record is None:
+                raise VideoNotFound(video_id) from exc
+            raise InvalidTransition(
+                video_id, current_record.status, VideoStatus.PROCESSING
+            ) from exc
+        item = dict(response["Attributes"])
+        item["video_id"] = video_id
+        return VideoRecord.from_item(item)
+
     def update_status(
         self,
         video_id: str,

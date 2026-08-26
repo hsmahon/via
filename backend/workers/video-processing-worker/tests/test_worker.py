@@ -1,4 +1,4 @@
-"""Worker tests: envelope normalization and the state machine."""
+"""Worker tests: EventBridge parsing, HTTP boundary, and idempotent transitions."""
 
 from __future__ import annotations
 
@@ -7,11 +7,20 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from via_worker_video_processing.envelope import normalize_event
+from via_worker_video_processing.events import parse_eventbridge_event, parse_video_id
 from via_worker_video_processing.main import create_app
 from via_worker_video_processing.settings import WorkerSettings
 
 EVENTBRIDGE_EVENT = {
+    "source": "aws.s3",
+    "detail-type": "Object Created",
+    "detail": {
+        "bucket": {"name": "via-videos"},
+        "object": {"key": "videos/user-1/v-123/clip.mp4", "size": 1024},
+    },
+}
+
+EVENTBRIDGE_FLAT_BUCKET = {
     "source": "aws.s3",
     "detail-type": "Object Created",
     "detail": {
@@ -20,7 +29,17 @@ EVENTBRIDGE_EVENT = {
     },
 }
 
-MINIO_EVENT = {
+EVENTBRIDGE_FLAT_KEY = {
+    "source": "aws.s3",
+    "detail-type": "Object Created",
+    "detail": {
+        "bucket": {"name": "via-videos"},
+        "key": "videos/user-1/v-123/clip.mp4",
+        "size": 1024,
+    },
+}
+
+MINIO_RECORDS_EVENT = {
     "EventName": "s3:ObjectCreated:Put",
     "Records": [
         {
@@ -31,6 +50,12 @@ MINIO_EVENT = {
             },
         }
     ],
+}
+
+MINIO_FLAT_EVENT = {
+    "EventName": "s3:ObjectCreated:Put",
+    "Bucket": "via-videos",
+    "Key": "videos%2Fu1%2Fv9%2Fa.mp4",
 }
 
 
@@ -62,40 +87,6 @@ def seeded(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[Any, Any]]:
         yield repo, vid
 
 
-class TestNormalizeEvent:
-    """Both production and local shapes map onto the canonical envelope."""
-
-    def test_eventbridge_shape(self) -> None:
-        """EventBridge payloads parse with source and detail preserved."""
-        envelope = normalize_event(EVENTBRIDGE_EVENT)
-        assert envelope.source == "aws.s3"
-        assert envelope.detail.key == "videos/user-1/v-123/clip.mp4"
-        assert envelope.parse_video_id() == "v-123"
-
-    def test_minio_shape(self) -> None:
-        """MinIO notifications parse into the same canonical model."""
-        envelope = normalize_event(MINIO_EVENT)
-        assert envelope.source == "minio.s3"
-        assert envelope.parse_video_id() == "v-123"
-
-    def test_minio_flat_and_url_encoded_shapes(self) -> None:
-        """MinIO's flat webhook form with percent-encoded keys parses."""
-        payload = {
-            "EventName": "s3:ObjectCreated:Put",
-            "Bucket": "via-videos",
-            "Key": "videos%2Fu1%2Fv9%2Fa.mp4",
-        }
-        envelope = normalize_event(payload)
-        assert envelope.parse_video_id() == "v9"
-
-    def test_unknown_shape_raises(self) -> None:
-        """Payloads matching neither shape raise ValueError."""
-        import pytest
-
-        with pytest.raises(ValueError):
-            normalize_event({"hello": "world"})
-
-
 def _event_for(video_id: str) -> dict[str, Any]:
     """Build an EventBridge-shaped event for one video id.
 
@@ -109,14 +100,122 @@ def _event_for(video_id: str) -> dict[str, Any]:
         "source": "aws.s3",
         "detail-type": "Object Created",
         "detail": {
-            "bucket": "via-videos",
+            "bucket": {"name": "via-videos"},
             "object": {"key": f"videos/user-1/{video_id}/clip.mp4", "size": 1024},
         },
     }
 
 
+class TestParseEventbridgeEvent:
+    """EventBridge validation accepts the production shape and rejects the rest."""
+
+    def test_valid_event_extracts_video_id(self) -> None:
+        """Valid EventBridge S3 Object Created event extracts correct video_id."""
+        event = parse_eventbridge_event(EVENTBRIDGE_EVENT)
+        assert event.source == "aws.s3"
+        assert event.detail.bucket == "via-videos"
+        assert event.detail.key == "videos/user-1/v-123/clip.mp4"
+        assert event.detail.size == 1024
+        assert event.parse_video_id() == "v-123"
+        assert parse_video_id(event.detail.key) == "v-123"
+
+    def test_flat_bucket_variant(self) -> None:
+        """Flattened bucket string variant parses identically."""
+        event = parse_eventbridge_event(EVENTBRIDGE_FLAT_BUCKET)
+        assert event.detail.bucket == "via-videos"
+        assert event.parse_video_id() == "v-123"
+
+    def test_flat_key_variant(self) -> None:
+        """Flattened detail.key variant (no object nesting) parses."""
+        event = parse_eventbridge_event(EVENTBRIDGE_FLAT_KEY)
+        assert event.detail.bucket == "via-videos"
+        assert event.detail.key == "videos/user-1/v-123/clip.mp4"
+        assert event.parse_video_id() == "v-123"
+
+    def test_url_encoded_key_decoded(self) -> None:
+        """Percent-encoded keys are decoded before video_id extraction."""
+        payload = {
+            "source": "aws.s3",
+            "detail-type": "Object Created",
+            "detail": {
+                "bucket": {"name": "via-videos"},
+                "object": {"key": "videos%2Fu1%2Fv9%2Fa.mp4", "size": 100},
+            },
+        }
+        event = parse_eventbridge_event(payload)
+        assert event.detail.key == "videos/u1/v9/a.mp4"
+        assert event.parse_video_id() == "v9"
+
+    def test_non_video_key_returns_none(self) -> None:
+        """Keys not matching videos/<user>/<video>/<file> return None."""
+        assert parse_video_id("other/prefix/file.mp4") is None
+        assert parse_video_id("videos/only-two") is None
+        payload = {
+            "source": "aws.s3",
+            "detail-type": "Object Created",
+            "detail": {
+                "bucket": {"name": "via-videos"},
+                "object": {"key": "other/prefix/file.mp4", "size": 1},
+            },
+        }
+        event = parse_eventbridge_event(payload)
+        assert event.parse_video_id() is None
+
+    def test_unknown_shape_raises(self) -> None:
+        """Payloads without detail raise ValueError."""
+        with pytest.raises(ValueError, match="missing 'detail'"):
+            parse_eventbridge_event({"hello": "world"})
+
+    def test_malformed_missing_bucket_or_key_raises(self) -> None:
+        """Missing bucket or key is rejected."""
+        with pytest.raises(ValueError):
+            parse_eventbridge_event(
+                {
+                    "source": "aws.s3",
+                    "detail-type": "Object Created",
+                    "detail": {"bucket": {"name": "via-videos"}},
+                }
+            )
+        with pytest.raises(ValueError):
+            parse_eventbridge_event(
+                {
+                    "source": "aws.s3",
+                    "detail-type": "Object Created",
+                    "detail": {"object": {"key": "videos/u1/v1/f.mp4"}},
+                }
+            )
+
+    def test_malformed_detail_not_object_raises(self) -> None:
+        """Non-object detail is rejected."""
+        with pytest.raises(ValueError, match="detail must be an object"):
+            parse_eventbridge_event(
+                {"source": "aws.s3", "detail-type": "Object Created", "detail": "oops"}
+            )
+
+    def test_unexpected_detail_type_rejected(self) -> None:
+        """Wrong detail-type is rejected."""
+        with pytest.raises(ValueError, match="unexpected detail-type"):
+            parse_eventbridge_event(
+                {
+                    "source": "aws.s3",
+                    "detail-type": "Object Deleted",
+                    "detail": {
+                        "bucket": {"name": "via-videos"},
+                        "object": {"key": "videos/u1/v1/f.mp4"},
+                    },
+                }
+            )
+
+    def test_minio_native_shapes_rejected(self) -> None:
+        """MinIO-native shapes are rejected as malformed for the prod path."""
+        with pytest.raises(ValueError):
+            parse_eventbridge_event(MINIO_RECORDS_EVENT)
+        with pytest.raises(ValueError):
+            parse_eventbridge_event(MINIO_FLAT_EVENT)
+
+
 class TestWorkerEndpoints:
-    """HTTP receiver drives real state transitions."""
+    """HTTP receiver drives real state transitions with idempotency."""
 
     def test_health(self) -> None:
         """GET /health reports ok."""
@@ -128,7 +227,6 @@ class TestWorkerEndpoints:
         repo, vid = seeded
         app = create_app(WorkerSettings(table_name="ignored"))
         app.dependency_overrides.clear()
-        # Rebind repository dependency to the moto-backed instance.
         from via_worker_video_processing.main import _repository
 
         _repository.cache_clear()
@@ -143,13 +241,132 @@ class TestWorkerEndpoints:
         finally:
             worker_main._repository = _repository  # restore for other tests
 
+    def test_duplicate_event_does_not_transition_again(self, seeded: tuple[Any, Any]) -> None:
+        """Duplicate delivery after transition is safely ignored."""
+        repo, vid = seeded
+        from via_worker_video_processing.handlers import handle_object_created
+
+        event = parse_eventbridge_event(_event_for(vid))
+        first = handle_object_created(
+            bucket=event.detail.bucket, key=event.detail.key, repository=repo
+        )
+        assert first.status == "processed"
+        assert repo.get(vid).status.value == "PROCESSED"
+
+        # Second delivery of the same Object Created event.
+        second = handle_object_created(
+            bucket=event.detail.bucket, key=event.detail.key, repository=repo
+        )
+        assert second.status == "ignored"
+        assert repo.get(vid).status.value == "PROCESSED"
+
+    def test_duplicate_via_http_is_idempotent(self, seeded: tuple[Any, Any]) -> None:
+        """Duplicate POST /events is idempotent and does not re-transition."""
+        repo, vid = seeded
+        app = create_app(WorkerSettings(table_name="ignored"))
+        from via_worker_video_processing.main import _repository
+
+        _repository.cache_clear()
+        import via_worker_video_processing.main as worker_main
+
+        worker_main._repository = lambda *a, **k: repo  # type: ignore[assignment]
+        try:
+            client = TestClient(app)
+            first = client.post("/events", json=_event_for(vid))
+            assert first.status_code == 200
+            assert first.json()["status"] == "processed"
+            second = client.post("/events", json=_event_for(vid))
+            assert second.status_code == 200
+            assert second.json()["status"] == "ignored"
+            assert repo.get(vid).status.value == "PROCESSED"
+        finally:
+            worker_main._repository = _repository
+
+    @pytest.mark.parametrize("target_status", ["PROCESSING", "PROCESSED", "FAILED"])
+    def test_already_transitioned_cannot_go_back_to_processing(
+        self, seeded: tuple[Any, Any], target_status: str
+    ) -> None:
+        """PROCESSING/PROCESSED/FAILED cannot be moved back to PROCESSING."""
+        from via_db import VideoStatus
+        from via_worker_video_processing.handlers import handle_object_created
+
+        repo, vid = seeded
+        # Drive the seeded UPLOADING video to the target state.
+        if target_status == "PROCESSING":
+            repo.mark_processing(vid)
+        elif target_status == "PROCESSED":
+            repo.mark_processing(vid)
+            repo.update_status(vid, VideoStatus.PROCESSED)
+        elif target_status == "FAILED":
+            repo.mark_processing(vid)
+            repo.update_status(vid, VideoStatus.FAILED)
+        assert repo.get(vid).status.value == target_status
+
+        event = parse_eventbridge_event(_event_for(vid))
+        outcome = handle_object_created(
+            bucket=event.detail.bucket, key=event.detail.key, repository=repo
+        )
+        assert outcome.status == "ignored"
+        assert repo.get(vid).status.value == target_status
+
+    def test_missing_video_handled_as_ignored(self) -> None:
+        """Events for unknown videos are acknowledged as ignored."""
+        from moto import mock_aws
+        from via_db.client import get_dynamodb_resource
+        from via_db.tables import create_table
+        from via_db.videos import VideoRepository
+        from via_worker_video_processing.handlers import handle_object_created
+
+        with mock_aws():
+            create_table(get_dynamodb_resource(region_name="us-east-1"), "t")
+            repo = VideoRepository(get_dynamodb_resource(region_name="us-east-1").Table("t"))
+            event = parse_eventbridge_event(EVENTBRIDGE_EVENT)
+            outcome = handle_object_created(
+                bucket=event.detail.bucket, key=event.detail.key, repository=repo
+            )
+            assert outcome.status == "ignored"
+            assert outcome.video_id == "v-123"
+
+    def test_non_video_key_is_ignored(self, seeded: tuple[Any, Any]) -> None:
+        """Keys not matching the video convention are ignored without transition."""
+        repo, _ = seeded
+        from via_worker_video_processing.handlers import handle_object_created
+
+        outcome = handle_object_created(bucket="via-videos", key="other/prefix/file.mp4", repository=repo)
+        assert outcome.status == "ignored"
+        assert outcome.video_id is None
+
+    def test_malformed_event_returns_400(self, seeded: tuple[Any, Any]) -> None:
+        """Malformed EventBridge payload is rejected with 400."""
+        repo, _ = seeded
+        app = create_app(WorkerSettings(table_name="ignored"))
+        from via_worker_video_processing.main import _repository
+
+        _repository.cache_clear()
+        import via_worker_video_processing.main as worker_main
+
+        worker_main._repository = lambda *a, **k: repo  # type: ignore[assignment]
+        try:
+            client = TestClient(app)
+            response = client.post("/events", json={"hello": "world"})
+            assert response.status_code == 400
+            # MinIO Records shape is also rejected on the prod path.
+            response2 = client.post("/events", json=MINIO_RECORDS_EVENT)
+            assert response2.status_code == 400
+            response3 = client.post("/events/minio", json=MINIO_RECORDS_EVENT)
+            assert response3.status_code == 400
+        finally:
+            worker_main._repository = _repository
+
     def test_hooks_enabled_marks_failed(self, seeded: tuple[Any, Any]) -> None:
         """With hooks on, pending integrations fail the video explicitly."""
         repo, vid = seeded
         from via_worker_video_processing.handlers import handle_object_created
 
+        event = parse_eventbridge_event(_event_for(vid))
         outcome = handle_object_created(
-            normalize_event(_event_for(vid)),
+            bucket=event.detail.bucket,
+            key=event.detail.key,
             repository=repo,
             hooks_enabled=True,
         )
@@ -158,16 +375,18 @@ class TestWorkerEndpoints:
         assert repo.get(vid).status.value == "FAILED"
 
     def test_unknown_video_ignored(self) -> None:
-        """Events for unknown videos are acknowledged as ignored."""
+        """Events for unknown videos are acknowledged as ignored (compat)."""
         from moto import mock_aws
         from via_db.client import get_dynamodb_resource
         from via_db.tables import create_table
         from via_db.videos import VideoRepository
+        from via_worker_video_processing.handlers import handle_object_created
 
         with mock_aws():
             create_table(get_dynamodb_resource(region_name="us-east-1"), "t")
             repo = VideoRepository(get_dynamodb_resource(region_name="us-east-1").Table("t"))
-            from via_worker_video_processing.handlers import handle_object_created
-
-            outcome = handle_object_created(normalize_event(EVENTBRIDGE_EVENT), repository=repo)
+            event = parse_eventbridge_event(EVENTBRIDGE_EVENT)
+            outcome = handle_object_created(
+                bucket=event.detail.bucket, key=event.detail.key, repository=repo
+            )
             assert outcome.status == "ignored"
