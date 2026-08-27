@@ -1,4 +1,10 @@
-"""FastAPI application factory for the video-processing worker."""
+"""FastAPI application factory for the video-processing worker.
+
+Exposes the HTTP event receiver at ``POST /events`` (EventBridge S3 Object
+Created) and health at ``GET /health``, wiring :class:`WorkerSettings` and
+:class:`VideoRepository` into request handling. Delegates object-created events
+to :mod:`via_worker_video_processing.handlers` for state transitions.
+"""
 
 from __future__ import annotations
 
