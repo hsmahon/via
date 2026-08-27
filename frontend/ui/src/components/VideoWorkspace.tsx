@@ -33,7 +33,7 @@ export interface VideoWorkspaceProps {
   /** Presigned stream URL or `null` while loading/empty. */
   src: string | null;
   /** Lifted time update invoked on every `timeupdate` event with `currentTime` seconds. */
-  onTimeUpdate: (currentTime: number) => void;
+  onTimeUpdate?: (currentTime: number) => void;
   /** Optional seek handler invoked by parent citation pills to jump the player. */
   onSeek?: (time: number) => void;
   /** Optional error message; when present an error state with retry is shown. */
@@ -65,7 +65,7 @@ export interface VideoWorkspaceProps {
 export default function VideoWorkspace({
   video,
   src,
-  onTimeUpdate,
+  onTimeUpdate = () => {},
   onSeek: _onSeek,
   error,
   onRetry,

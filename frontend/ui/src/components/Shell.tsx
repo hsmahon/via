@@ -116,10 +116,7 @@ export default function Shell({
           {right ? <div className="shell-right">{right}</div> : null}
         </>
       ) : children ? (
-        <>
-          {sidebarNode}
-          {children}
-        </>
+        <>{children}</>
       ) : (
         sidebarNode
       )}
