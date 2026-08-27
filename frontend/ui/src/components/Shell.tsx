@@ -11,6 +11,10 @@ import Sidebar from "./Sidebar";
 
 /**
  * Props for the 3-pane workstation shell.
+ *
+ * `collapsed` and `onCollapsedChange` drive controlled mode, while `left`
+ * / `center` / `right` / `children` provide the 3-pane slots. When `left` is
+ * omitted the shell renders the built-in `Sidebar`.
  */
 export interface ShellProps {
   /** Optional controlled collapsed flag; when omitted the shell manages state via localStorage. */
@@ -73,6 +77,8 @@ export default function Shell({
 
   /**
    * Toggle collapsed state and persist to localStorage.
+   *
+   * @returns Nothing; flips the collapsed flag, writes `via:sidebar-collapsed` when uncontrolled, and notifies `onCollapsedChange`.
    */
   function handleToggle(): void {
     const next = !collapsed;

@@ -11,7 +11,11 @@ import "./VideoWorkspace.css";
 import { formatDuration } from "../lib/status";
 
 /**
- * Minimal video identity accepted by the workspace; `duration` and `status` are optional and rendered only when present.
+ * Minimal video identity accepted by the workspace.
+ *
+ * `filename` and `video_id` are required for the filebar, while `duration`
+ * and `status` are optional and rendered only when present. Matches the
+ * subset of `Video` needed for the center pane.
  */
 export interface WorkspaceVideo {
   /** Original filename shown in the filebar. */
@@ -25,7 +29,11 @@ export interface WorkspaceVideo {
 }
 
 /**
- * Props for the centered video workspace; `video` may be `null` to render the empty placeholder and `src` is the presigned GET URL (or `null` while loading).
+ * Props for the centered video workspace.
+ *
+ * `video` may be `null` to render the empty placeholder, `src` is the
+ * presigned GET URL (or `null` while loading), and `onTimeUpdate`/`onSeek`
+ * wire citation highlight and seek. `error`/`onRetry` drive the retry state.
  */
 export interface VideoWorkspaceProps {
   /** Selected video identity or `null`/`undefined` when no selection. */
@@ -105,7 +113,9 @@ export default function VideoWorkspace({
         <div className="filebar mono">
           <span className="filename">{video.filename}</span>
           <span className="filebar-meta">
-            {video.duration !== undefined ? formatDuration(video.duration ?? null) : null}
+            {video.duration !== undefined
+              ? formatDuration(video.duration ?? null)
+              : null}
             {video.status ? ` · ${video.status}` : null}
           </span>
         </div>

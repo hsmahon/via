@@ -12,7 +12,11 @@ import { formatDuration, statusColor } from "../lib/status";
 import type { Video } from "../lib/api";
 
 /**
- * Props for the video library list; `selectedId` drives green left-edge row highlight and `onSelect` wires click and keyboard `↑`/`↓` selection.
+ * Props for the video library list.
+ *
+ * `videos` is rendered newest-first, `selectedId` drives the green left-edge
+ * highlight and `aria-selected`, and `onSelect` wires click and keyboard
+ * `↑`/`↓`/`Enter` selection. Rows are boxy `56px` grids owned by `Library.css`.
  */
 export interface LibraryProps {
   /** Videos to display, newest first. */
@@ -44,13 +48,16 @@ export interface LibraryProps {
  */
 export default function Library({ videos, selectedId, onSelect }: LibraryProps) {
   if (videos.length === 0) {
-    return <div className="library-empty">No videos yet. Upload one to get started.</div>;
+    return (
+      <div className="library-empty">No videos yet. Upload one to get started.</div>
+    );
   }
 
   /**
    * Handle arrow key navigation across the list.
    *
    * @param event - Keyboard event from the listbox container.
+   * @returns Nothing; moves selection with `ArrowDown`/`ArrowUp`.
    */
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>): void {
     if (videos.length === 0) return;
@@ -69,7 +76,13 @@ export default function Library({ videos, selectedId, onSelect }: LibraryProps) 
   }
 
   return (
-    <div className="library" role="listbox" aria-label="Video library" tabIndex={0} onKeyDown={handleKeyDown}>
+    <div
+      className="library"
+      role="listbox"
+      aria-label="Video library"
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+    >
       {videos.map((video) => {
         const isSelected = video.video_id === selectedId;
         const dotClass = `dot dot-${video.status.toLowerCase()}`;
@@ -93,7 +106,11 @@ export default function Library({ videos, selectedId, onSelect }: LibraryProps) 
               <span className="filename">{video.filename}</span>
               <span className="meta mono">
                 <span>{formatDuration(video.duration)}</span>
-                <span className={dotClass} style={{ background: statusColor(video.status) }} aria-hidden="true" />
+                <span
+                  className={dotClass}
+                  style={{ background: statusColor(video.status) }}
+                  aria-hidden="true"
+                />
                 <span>{video.status}</span>
               </span>
             </div>

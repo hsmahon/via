@@ -11,6 +11,9 @@ import { listVideos, type Video } from "./api";
 
 /**
  * Return value of {@link useVideos}.
+ *
+ * Bundles the polled `videos`, `loading`/`error` flags, and a manual
+ * `refresh` that callers can invoke after uploads or retries.
  */
 export interface UseVideosResult {
   /** Current video list, newest first. */

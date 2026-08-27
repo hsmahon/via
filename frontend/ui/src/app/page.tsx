@@ -19,6 +19,10 @@ import { useVideoStream } from "../lib/useVideoStream";
 /**
  * Home page orchestrating the 3-pane workstation.
  *
+ * Owns `selectedId` and `collapsed` state, drives `useVideos`/`useVideoStream`
+ * /`useAgentStream`, and composes `Shell`/`Sidebar`/`Library`/
+ * `VideoWorkspace`/`AgentPane` with auto-select of first `PROCESSED` video.
+ *
  * @returns The workstation shell with Library, VideoWorkspace, and AgentPane.
  */
 export default function HomePage() {

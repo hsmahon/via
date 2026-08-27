@@ -9,7 +9,12 @@
 import React, { useState } from "react";
 import "./AgentPane.css";
 
-/** Message displayed inside the agent pane; citations are timestamped transcript spans. */
+/**
+ * Message displayed inside the agent pane.
+ *
+ * `role` distinguishes user vs assistant, `content` holds the text, and
+ * `citations` are optional timestamped transcript spans rendered as seek pills.
+ */
 export interface AgentPaneMessage {
   /** Message role — user or assistant. */
   role: "user" | "assistant";
@@ -19,7 +24,13 @@ export interface AgentPaneMessage {
   citations?: { ts: number; text: string }[];
 }
 
-/** Props for the right-rail agent pane. */
+/**
+ * Props for the right-rail agent pane.
+ *
+ * `messages` and `isStreaming` drive the log and pulsing dot, `onSend` handles
+ * trimmed `Enter` submission, and `disabled`/`onSeek` control input enablement
+ * and citation seek jumps. Styled by `AgentPane.css`.
+ */
 export interface AgentPaneProps {
   /** Ordered chat history to render. */
   messages: AgentPaneMessage[];

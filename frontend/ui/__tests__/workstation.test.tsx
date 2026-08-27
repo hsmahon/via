@@ -11,8 +11,9 @@ import HomePage from "../src/app/page";
 
 describe("workstation", () => {
   it("renders 3 panes", async () => {
-    global.fetch = vi.fn(async () =>
-      ({ ok: true, json: async () => ({ items: [] }) }) as unknown as Response,
+    global.fetch = vi.fn(
+      async () =>
+        ({ ok: true, json: async () => ({ items: [] }) }) as unknown as Response,
     );
     render(<HomePage />);
     expect(await screen.findByText("VIA")).toBeVisible();

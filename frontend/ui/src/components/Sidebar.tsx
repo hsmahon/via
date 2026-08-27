@@ -10,7 +10,11 @@ import React from "react";
 import "./Sidebar.css";
 
 /**
- * Props for the collapsible sidebar rail; `collapsed` drives 60/240px width and `onToggle` is wired to the Expand/Collapse button.
+ * Props for the collapsible sidebar rail.
+ *
+ * `collapsed` drives the `60px` vs `240px` width and `data-collapsed`
+ * attribute, while `onToggle` is wired to the Expand/Collapse button in the
+ * top slot. Rendered by `Shell` as the left rail.
  */
 export interface SidebarProps {
   /** Whether the sidebar is in collapsed (icon-only) state. */

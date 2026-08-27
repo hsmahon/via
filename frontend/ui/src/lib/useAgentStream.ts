@@ -8,11 +8,22 @@
 
 import { useState } from "react";
 
-/** Base URL of the Via agent service. */
+/**
+ * Base URL of the Via agent service.
+ *
+ * Defaults to `http://localhost:8081` and is overridden by
+ * `NEXT_PUBLIC_AGENT_URL` in production. Used by `useAgentStream` to POST
+ * to `/agent/invoke` with the v0.1 `X-User-Id` header.
+ */
 export const AGENT_URL: string =
   process.env.NEXT_PUBLIC_AGENT_URL ?? "http://localhost:8081";
 
-/** Citation returned by the agent — timestamp in seconds and quoted text. */
+/**
+ * Citation returned by the agent.
+ *
+ * Carries `ts` in seconds and `text` quoted from the transcript span that
+ * grounds an assistant answer. Rendered as seek pills in `AgentPane`.
+ */
 export interface AgentCitation {
   /** Timestamp in seconds that the citation refers to. */
   ts: number;
@@ -20,7 +31,13 @@ export interface AgentCitation {
   text: string;
 }
 
-/** Chat message stored in the `useAgentStream` history. */
+/**
+ * Chat message stored in the `useAgentStream` history.
+ *
+ * `role` is `user` or `assistant`, `content` is progressively streamed
+ * word-by-word for assistant turns, and `citations` are optional grounded
+ * transcript spans.
+ */
 export interface AgentMessage {
   /** Message role — user prompt or assistant answer. */
   role: "user" | "assistant";
