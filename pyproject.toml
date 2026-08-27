@@ -9,7 +9,7 @@ requires-python = ">=3.12,<3.13"
 package = false
 
 [tool.uv.workspace]
-members = ["backend/db", "backend/api", "backend/agent/*", "backend/workers/*"]
+members = ["backend/db", "backend/api", "backend/agent/*", "backend/workers"]
 exclude = ["backend/agent/evaluations"]
 
 [dependency-groups]
@@ -37,7 +37,7 @@ extend-exclude = [".venv", "node_modules"]
 [tool.ruff.lint.per-file-ignores]
 # FastAPI dependency injection requires call expressions in defaults.
 "backend/agent/service/src/via_agent/main.py" = ["B008"]
-"backend/workers/video-processing-worker/src/via_worker_video_processing/main.py" = ["B008"]
+"backend/workers/src/via_worker_video_processing/main.py" = ["B008"]
 
 [tool.ruff.lint]
 select = [

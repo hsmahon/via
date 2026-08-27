@@ -44,7 +44,7 @@ jobs:
             backend/agent/prompts/src \
             backend/agent/tools/src \
             backend/agent/service/src \
-            backend/workers/video-processing-worker/src \
+            backend/workers/src \
             tests
 
       - name: Tests

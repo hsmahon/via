@@ -7,7 +7,7 @@ understands it.
 | ------------------ | ----------------------------------------------------------------------------------------------------------------- |
 | API service        | FastAPI (`backend/api`)                                                                                           |
 | Agent runtime      | Via-owned harness, zero framework deps (`backend/agent/harness`) + thin FastAPI wrapper (`backend/agent/service`) |
-| Processing worker  | event-driven state machine (`backend/workers/video-processing-worker`)                                            |
+| Processing worker  | event-driven state machine (`backend/workers` — `src/via_worker_video_processing`, `tests/`)                      |
 | UI                 | Next.js + TypeScript (`frontend/ui`)                                                                              |
 | State              | DynamoDB single table (DynamoDB Local in dev)                                                                     |
 | Storage            | S3 (MinIO in dev), direct presigned uploads                                                                       |
@@ -36,8 +36,7 @@ backend/
     prompts/              Versioned YAML prompts (FilePromptResolver)
     tools/                Domain tools (get_video_metadata, etc.)
     service/              Thin FastAPI wrapper over harness (wiring.py)
-  workers/
-    video-processing-worker/  Async event-driven state machine (S3 → DDB)
+  workers/                  Async event-driven state machine (S3 → DDB) — src/via_worker_video_processing + tests
   db/                     Persistence (DynamoDB single-table, entities, repo)
   shared/                 Genuinely shared backend code (empty by default)
   Dockerfile.python       Shared Python service image (uv workspace aware)
