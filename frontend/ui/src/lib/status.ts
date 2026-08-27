@@ -1,13 +1,19 @@
 /**
- * Map a lifecycle status onto display styling.
+ * Video status display helpers for the dark workstation palette.
+ * Exports `statusColor` (status → CSS color, PROCESSED maps to `var(--accent)` green) and `formatDuration` (seconds → "1m 05s" / "42s" / "-") used by `Library` rows and `VideoWorkspace` header.
+ * Depends only on CSS tokens in `globals.css`; no runtime dependencies and safe to import in any client component.
+ */
+
+/**
+ * Map a lifecycle status onto display styling for the dark palette.
  *
  * @param status - Raw API status string.
- * @returns Tailwind-free CSS color class for the status chip.
+ * @returns CSS color for the status chip or dot (PROCESSED → `var(--accent)`).
  */
 export function statusColor(status: string): string {
   switch (status) {
     case "PROCESSED":
-      return "#1a7f37";
+      return "var(--accent)";
     case "PROCESSING":
       return "#9a6700";
     case "FAILED":

@@ -5,9 +5,9 @@ import { describe, expect, it } from "vitest";
 import { formatDuration, statusColor } from "../src/lib/status";
 
 describe("statusColor", () => {
-  /** Processed videos render green. */
+  /** Processed videos render green via dark token. */
   it("maps PROCESSED to green", () => {
-    expect(statusColor("PROCESSED")).toBe("#1a7f37");
+    expect(statusColor("PROCESSED")).toBe("var(--accent)");
   });
 
   /** Failed videos render red. */
