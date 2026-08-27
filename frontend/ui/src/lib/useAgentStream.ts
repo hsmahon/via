@@ -95,15 +95,15 @@ export function useAgentStream(videoId: string | null): {
           const copy = [...m];
           const last = copy[copy.length - 1];
           if (last?.role === "assistant") {
-            last.content = snapshot;
-            return [...copy];
+            copy[copy.length - 1] = { ...last, content: snapshot };
+            return copy;
           }
           copy.push({
             role: "assistant",
             content: snapshot,
             citations,
           });
-          return [...copy];
+          return copy;
         });
         await new Promise<void>((r) => setTimeout(r, 30));
       }

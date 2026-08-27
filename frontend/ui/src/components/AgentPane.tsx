@@ -42,6 +42,8 @@ export interface AgentPaneProps {
   disabled?: boolean;
   /** Seek handler invoked when a citation pill is clicked with timestamp seconds. */
   onSeek?: (ts: number) => void;
+  /** Current playback time in seconds, used to highlight the active citation. */
+  currentTime?: number;
 }
 
 /**
@@ -82,6 +84,7 @@ export default function AgentPane({
   onSend,
   disabled = false,
   onSeek,
+  currentTime: _currentTime,
 }: AgentPaneProps) {
   const [text, setText] = useState("");
 

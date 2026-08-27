@@ -42,8 +42,8 @@ export interface VideoWorkspaceProps {
   src: string | null;
   /** Lifted time update invoked on every `timeupdate` event with `currentTime` seconds. */
   onTimeUpdate?: (currentTime: number) => void;
-  /** Optional seek handler invoked by parent citation pills to jump the player. */
-  onSeek?: (time: number) => void;
+  /** Seek target in seconds; when set, the player seeks to this time. */
+  seekTo?: number | null;
   /** Optional error message; when present an error state with retry is shown. */
   error?: string | null;
   /** Retry handler for the error state; refetches the presigned URL when provided. */
@@ -74,15 +74,17 @@ export default function VideoWorkspace({
   video,
   src,
   onTimeUpdate = () => {},
-  onSeek: _onSeek,
+  seekTo,
   error,
   onRetry,
 }: VideoWorkspaceProps) {
   const ref = useRef<HTMLVideoElement>(null);
 
-  // Expose seek to parent via onSeek prop already; player itself is controlled
-  // by src; keep ref for potential imperative seek wiring without adding extra API.
-  void _onSeek;
+  React.useEffect(() => {
+    if (seekTo !== null && seekTo !== undefined && ref.current) {
+      ref.current.currentTime = seekTo;
+    }
+  }, [seekTo]);
 
   if (error) {
     return (

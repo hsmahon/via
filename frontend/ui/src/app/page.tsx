@@ -28,18 +28,22 @@ import { useVideoStream } from "../lib/useVideoStream";
 export default function HomePage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
-  const { videos } = useVideos("dev-user");
-  const src = useVideoStream(selectedId);
+  const [seekTo, setSeekTo] = useState<number | null>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const userId = "dev-user";
+  const { videos } = useVideos(userId);
+  const {
+    url: src,
+    error: streamError,
+    retry: retryStream,
+  } = useVideoStream(selectedId, userId);
   const { messages, streaming, send } = useAgentStream(selectedId);
 
   useEffect(() => {
     if (!selectedId && videos.length > 0) {
       const firstProcessed = videos.find((v) => v.status === "PROCESSED");
-      const fallback = videos[0];
       if (firstProcessed) {
         setSelectedId(firstProcessed.video_id);
-      } else if (fallback) {
-        setSelectedId(fallback.video_id);
       }
     }
   }, [videos, selectedId]);
@@ -50,13 +54,21 @@ export default function HomePage() {
     <Shell collapsed={collapsed} onCollapsedChange={setCollapsed}>
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
       <Library videos={videos} selectedId={selectedId} onSelect={setSelectedId} />
-      <VideoWorkspace video={selected} src={src} onTimeUpdate={() => {}} />
+      <VideoWorkspace
+        video={selected}
+        src={src}
+        error={streamError}
+        onRetry={retryStream}
+        seekTo={seekTo}
+        onTimeUpdate={setCurrentTime}
+      />
       <AgentPane
         messages={messages}
         isStreaming={streaming}
+        currentTime={currentTime}
         onSend={send}
         disabled={!selected || selected.status !== "PROCESSED"}
-        onSeek={() => {}}
+        onSeek={setSeekTo}
       />
     </Shell>
   );
