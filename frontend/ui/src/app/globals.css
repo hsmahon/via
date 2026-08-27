@@ -1,5 +1,62 @@
-:root{--bg:#080808;--panel:#101010;--panel-2:#151515;--border:#2A2A2A;--border-strong:#333;--text:#E8E8E3;--muted:#8A8A8A;--muted-2:#5A5A5A;--accent:#2ECC71;--accent-hover:#34D399;--accent-weak:#12301A;--accent-ring:rgba(46,204,113,.35);--sidebar-width:240px;--agent-width:360px;--font-sans:ui-sans-system,-apple-system,Inter,"Geist Sans",sans-serif;--font-mono:"JetBrains Mono","Geist Mono",ui-monospace,monospace}
-*{box-sizing:border-box}html,body{height:100%}body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:14px;line-height:1.4}
-button{border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:0;padding:6px 10px;cursor:pointer;font:inherit}button:hover{border-color:var(--border-strong)}button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.panel{border:1px solid var(--border);background:var(--panel)} .mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
-.shell{height:100vh;display:grid;grid-template-columns:var(--sidebar-width) 1fr var(--agent-width)}
+:root {
+  --bg: #080808;
+  --panel: #101010;
+  --panel-2: #151515;
+  --border: #2a2a2a;
+  --border-strong: #333;
+  --text: #e8e8e3;
+  --muted: #8a8a8a;
+  --muted-2: #5a5a5a;
+  --accent: #2ecc71;
+  --accent-hover: #34d399;
+  --accent-weak: #12301a;
+  --accent-ring: rgba(46, 204, 113, 0.35);
+  --sidebar-width: 240px;
+  --agent-width: 360px;
+  --font-sans: ui-sans-system, -apple-system, Inter, "Geist Sans", sans-serif;
+  --font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, monospace;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.4;
+}
+button {
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: 0;
+  padding: 6px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+button:hover {
+  border-color: var(--border-strong);
+}
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.panel {
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.shell {
+  height: 100vh;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr var(--agent-width);
+}

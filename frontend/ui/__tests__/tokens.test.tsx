@@ -18,10 +18,11 @@ describe("tokens", () => {
       }
     }
     if (!css) css = fs.readFileSync("src/app/globals.css", "utf8");
-    expect(css).toMatch(/--bg:\s*#080808/);
-    expect(css).toMatch(/--panel:\s*#101010/);
-    expect(css).toMatch(/--accent:\s*#2ECC71/);
-    expect(css).toMatch(/--text:\s*#E8E8E3/);
-    expect(css).not.toMatch(/#f6f8fa/); // old light bg removed
+    const lower = css.toLowerCase();
+    expect(lower).toMatch(/--bg:\s*#080808/);
+    expect(lower).toMatch(/--panel:\s*#101010/);
+    expect(lower).toMatch(/--accent:\s*#2ecc71/);
+    expect(lower).toMatch(/--text:\s*#e8e8e3/);
+    expect(lower).not.toMatch(/#f6f8fa/); // old light bg removed
   });
 });
