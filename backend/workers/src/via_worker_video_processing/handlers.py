@@ -1,10 +1,7 @@
 """Event handlers driving the video state machine.
 
-Exports :class:`HandlerOutcome` and :func:`handle_object_created` which drives
-``UPLOADING`` → ``PROCESSING`` → ``PROCESSED``/``FAILED`` via
-:class:`VideoRepository` with idempotent handling and optional Pegasus analysis.
-Depends on :mod:`via_db` for state transitions and
-:mod:`via_worker_video_processing.pegasus` for video analysis.
+Exports :class:`HandlerOutcome` and :func:`handle_object_created` which drives ``UPLOADING`` → ``PROCESSING`` → ``PROCESSED``/``FAILED`` via :class:`VideoRepository` with idempotent handling and optional Pegasus analysis.
+Depends on :mod:`via_db` for state transitions and :mod:`via_worker_video_processing.pegasus` for video analysis.
 """
 
 from __future__ import annotations
