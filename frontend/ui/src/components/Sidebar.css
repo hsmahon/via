@@ -1,0 +1,64 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.sidebar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px;
+  border-bottom: 1px solid var(--border);
+  min-height: 48px;
+}
+
+.sidebar-top .logo {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.sidebar-top button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.sidebar nav {
+  flex: 1;
+  padding: 12px 8px;
+}
+
+.sidebar nav a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.sidebar nav a.nav-active {
+  color: var(--text);
+  background: var(--panel-2);
+  border-color: var(--border);
+}
+
+.sidebar-bottom {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+}
