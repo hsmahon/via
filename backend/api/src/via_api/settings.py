@@ -21,17 +21,19 @@ class Settings(BaseSettings):
     table_name: str = "via"
     bucket: str = "via-videos"
     dynamodb_endpoint_url: str | None = None
-    #: Optional S3 endpoint override for testing (LocalStack); None uses real S3.
     s3_endpoint_url: str | None = None
-    #: Optional public endpoint embedded in presigned URLs (LocalStack);
-    #: must be reachable by the client; None uses real S3 / reuses primary client.
+    """Optional S3 endpoint override for testing (LocalStack); None uses real S3."""
+
     s3_public_endpoint_url: str | None = None
+    """Optional public endpoint embedded in presigned URLs (LocalStack); must be reachable by the client; None uses real S3 / reuses primary client."""
+
     presign_expiry_seconds: int = 900
     default_user_id: str = "dev-user"
-    #: Maximum videos a single user may create (quota). Evaluated at write time.
     max_videos_per_user: int = 20
-    #: Comma-separated allow-list for ``content_type``; empty allows any type.
+    """Maximum videos a single user may create (quota). Evaluated at write time."""
+
     allowed_video_content_types: str = "video/mp4,video/quicktime,video/mpeg"
+    """Comma-separated allow-list for ``content_type``; empty allows any type."""
 
     @property
     def allowed_content_type_set(self) -> set[str]:
