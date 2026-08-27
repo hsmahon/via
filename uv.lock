@@ -1077,7 +1077,7 @@ requires-dist = [{ name = "pydantic", specifier = ">=2.9.0" }]
 [[package]]
 name = "via-video-processing-worker"
 version = "0.1.0"
-source = { editable = "backend/workers/video-processing-worker" }
+source = { editable = "backend/workers" }
 dependencies = [
     { name = "boto3" },
     { name = "fastapi" },

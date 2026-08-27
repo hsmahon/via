@@ -360,8 +360,8 @@ class TestWorkerEndpoints:
         finally:
             worker_main._repository = _repository
 
-    def test_hooks_enabled_marks_failed(self, seeded: tuple[Any, Any]) -> None:
-        """With hooks on, pending integrations fail the video explicitly."""
+    def test_hooks_enabled_with_mock_processes_video(self, seeded: tuple[Any, Any]) -> None:
+        """With hooks on, mock Transcribe/Pegasus completes the video."""
         repo, vid = seeded
         from via_worker_video_processing.handlers import handle_object_created
 
@@ -372,8 +372,52 @@ class TestWorkerEndpoints:
             repository=repo,
             hooks_enabled=True,
         )
+        assert outcome.status == "processed"
+        assert repo.get(vid).status.value == "PROCESSED"
+
+    def test_hooks_enabled_marks_failed(
+        self, seeded: tuple[Any, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """With hooks on, a failing Transcribe marks the video FAILED."""
+        repo, vid = seeded
+        from via_worker_video_processing import handlers as handlers_mod
+        from via_worker_video_processing.handlers import handle_object_created
+
+        def _fail(*_a: object, **_kw: object) -> None:
+            raise NotImplementedError("Amazon Transcribe integration is scheduled for v0.2")
+
+        monkeypatch.setattr(handlers_mod, "transcribe", _fail)
+        event = parse_eventbridge_event(_event_for(vid))
+        outcome = handle_object_created(
+            bucket=event.detail.bucket,
+            key=event.detail.key,
+            repository=repo,
+            hooks_enabled=True,
+        )
         assert outcome.status == "failed"
         assert outcome.detail
+        assert repo.get(vid).status.value == "FAILED"
+
+    def test_mock_failure_marks_failed(
+        self, seeded: tuple[Any, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Injected mock failure marks the video FAILED."""
+        repo, vid = seeded
+        from via_worker_video_processing import handlers as handlers_mod
+        from via_worker_video_processing.handlers import handle_object_created
+
+        def _fail(*_a: object, **_kw: object) -> None:
+            raise RuntimeError("mock transcribe failure (injected)")
+
+        monkeypatch.setattr(handlers_mod, "transcribe", _fail)
+        event = parse_eventbridge_event(_event_for(vid))
+        outcome = handle_object_created(
+            bucket=event.detail.bucket,
+            key=event.detail.key,
+            repository=repo,
+            hooks_enabled=True,
+        )
+        assert outcome.status == "failed"
         assert repo.get(vid).status.value == "FAILED"
 
     def test_unknown_video_ignored(self) -> None:
@@ -392,3 +436,151 @@ class TestWorkerEndpoints:
                 bucket=event.detail.bucket, key=event.detail.key, repository=repo
             )
             assert outcome.status == "ignored"
+
+
+class TestV02MockedProcessing:
+    """V0.2: deterministic mocks with dependency boundaries, no AWS calls."""
+
+    def test_transcribe_deterministic_mock(self) -> None:
+        """Transcribe returns deterministic job_name and transcript_key."""
+        from via_worker_video_processing.transcribe import transcribe
+
+        r1 = transcribe(bucket="via-videos", key="videos/u1/v-abc/clip.mp4")
+        r2 = transcribe(bucket="via-videos", key="videos/u1/v-abc/clip.mp4")
+        assert r1.job_name == r2.job_name == "mock-transcribe-v-abc"
+        assert r1.transcript_key == "transcripts/v-abc/transcript.json"
+        assert r1.status == "COMPLETED"
+        r3 = transcribe(bucket="via-videos", key="videos/u1/v-abc/other.mp4")
+        assert r3.job_name == r1.job_name
+
+        # Non-video key still deterministic via hash suffix.
+        r4 = transcribe(bucket="b", key="other/prefix/file.mp4")
+        r5 = transcribe(bucket="b", key="other/prefix/file.mp4")
+        assert r4.job_name == r5.job_name
+        assert r4.transcript_key is None or r4.transcript_key.startswith("transcripts/")
+
+    def test_pegasus_deterministic_mock(self) -> None:
+        """analyze_with_pegasus returns deterministic answer."""
+        from via_worker_video_processing.pegasus import analyze_with_pegasus
+
+        a1 = analyze_with_pegasus(bucket="b", key="videos/u1/v1/clip.mp4")
+        a2 = analyze_with_pegasus(bucket="b", key="videos/u1/v1/clip.mp4")
+        assert a1.answer == a2.answer
+        assert "s3://b/videos/u1/v1/clip.mp4" in a1.answer
+
+        a3 = analyze_with_pegasus(bucket="b", key="videos/u1/v1/clip.mp4", question="what?")
+        assert "what?" in a3.answer
+
+    def test_handler_orchestrates_both_on_valid_event(self, seeded: tuple[Any, Any]) -> None:
+        """Valid EventBridge event triggers both transcribe and pegasus via boundaries."""
+        repo, vid = seeded
+        from via_worker_video_processing.handlers import handle_object_created
+        from via_worker_video_processing.pegasus import PegasusAnalysis
+        from via_worker_video_processing.transcribe import TranscriptionResult
+
+        event = parse_eventbridge_event(_event_for(vid))
+        calls: list[tuple[str, str, str]] = []
+
+        def _mock_transcribe(*, bucket: str, key: str) -> TranscriptionResult:
+            calls.append(("transcribe", bucket, key))
+            return TranscriptionResult(
+                job_name="mock-job", transcript_key="transcripts/x.json", status="COMPLETED"
+            )
+
+        def _mock_analyze(*, bucket: str, key: str, question: str | None = None) -> PegasusAnalysis:
+            _ = question
+            calls.append(("pegasus", bucket, key))
+            return PegasusAnalysis(answer="ok")
+
+        outcome = handle_object_created(
+            bucket=event.detail.bucket,
+            key=event.detail.key,
+            repository=repo,
+            hooks_enabled=True,
+            transcribe_fn=_mock_transcribe,
+            analyze_fn=_mock_analyze,
+        )
+        assert outcome.status == "processed"
+        assert repo.get(vid).status.value == "PROCESSED"
+        assert calls == [
+            ("transcribe", event.detail.bucket, event.detail.key),
+            ("pegasus", event.detail.bucket, event.detail.key),
+        ]
+
+    def test_handler_transcribe_failure_marks_failed(self, seeded: tuple[Any, Any]) -> None:
+        """Transcribe failure via boundary marks video FAILED."""
+        repo, vid = seeded
+        from via_worker_video_processing.handlers import handle_object_created
+
+        event = parse_eventbridge_event(_event_for(vid))
+
+        def _fail_transcribe(*, bucket: str, key: str) -> None:
+            _ = (bucket, key)
+            raise RuntimeError("transcribe boom")
+
+        outcome = handle_object_created(
+            bucket=event.detail.bucket,
+            key=event.detail.key,
+            repository=repo,
+            hooks_enabled=True,
+            transcribe_fn=_fail_transcribe,
+        )
+        assert outcome.status == "failed"
+        assert "transcribe boom" in (outcome.detail or "")
+        assert repo.get(vid).status.value == "FAILED"
+
+    def test_handler_pegasus_failure_marks_failed(self, seeded: tuple[Any, Any]) -> None:
+        """Pegasus failure via boundary marks video FAILED (after transcribe)."""
+        repo, vid = seeded
+        from via_worker_video_processing.handlers import handle_object_created
+        from via_worker_video_processing.transcribe import TranscriptionResult
+
+        event = parse_eventbridge_event(_event_for(vid))
+
+        def _ok_transcribe(*, bucket: str, key: str) -> TranscriptionResult:
+            _ = (bucket, key)
+            return TranscriptionResult(job_name="mock", transcript_key=None, status="COMPLETED")
+
+        def _fail_analyze(*, bucket: str, key: str, question: str | None = None) -> None:
+            _ = (bucket, key, question)
+            raise RuntimeError("pegasus boom")
+
+        outcome = handle_object_created(
+            bucket=event.detail.bucket,
+            key=event.detail.key,
+            repository=repo,
+            hooks_enabled=True,
+            transcribe_fn=_ok_transcribe,
+            analyze_fn=_fail_analyze,
+        )
+        assert outcome.status == "failed"
+        assert "pegasus boom" in (outcome.detail or "")
+        assert repo.get(vid).status.value == "FAILED"
+
+    def test_handler_does_not_call_processing_when_hooks_disabled(
+        self, seeded: tuple[Any, Any]
+    ) -> None:
+        """When hooks are disabled, processing boundaries are not invoked."""
+        repo, vid = seeded
+        from via_worker_video_processing.handlers import handle_object_created
+
+        event = parse_eventbridge_event(_event_for(vid))
+
+        def _fail_transcribe(*, bucket: str, key: str) -> None:
+            _ = (bucket, key)
+            raise AssertionError("should not be called")
+
+        def _fail_analyze(*, bucket: str, key: str, question: str | None = None) -> None:
+            _ = (bucket, key, question)
+            raise AssertionError("should not be called")
+
+        outcome = handle_object_created(
+            bucket=event.detail.bucket,
+            key=event.detail.key,
+            repository=repo,
+            hooks_enabled=False,
+            transcribe_fn=_fail_transcribe,
+            analyze_fn=_fail_analyze,
+        )
+        assert outcome.status == "processed"
+        assert repo.get(vid).status.value == "PROCESSED"

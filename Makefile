@@ -26,7 +26,7 @@ format: ## Auto-format Python (ruff) and JS/TS (prettier)
 	npm run format
 
 typecheck: ## Run mypy (production sources + meta-tests) and tsc
-	uv run mypy backend/db/src backend/api/src backend/agent/harness/src backend/agent/observability/src backend/agent/prompts/src backend/agent/tools/src backend/agent/service/src backend/workers/video-processing-worker/src tests
+	uv run mypy backend/db/src backend/api/src backend/agent/harness/src backend/agent/observability/src backend/agent/prompts/src backend/agent/tools/src backend/agent/service/src backend/workers/src tests
 	npm run typecheck
 
 test: ## Run pytest and vitest

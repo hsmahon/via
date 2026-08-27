@@ -12,13 +12,13 @@ backend/agent/prompts/         YAML prompts at prompts/<name>/v<N>.yaml (`video_
 backend/agent/observability/   Structured logging (`via_observability`, structlog) — harness `Tracer` impl is `LocalTracer` in `backend/agent/harness`
 backend/api/             FastAPI — presigned upload, video CRUD (pk via_api.main)
 backend/agent/service/           FastAPI wrapper over harness (via_agent.main, wiring in wiring.py)
-backend/workers/video-processing-worker/  Event-driven state machine (via_worker_video_processing.main)
+backend/workers/  Event-driven state machine (via_worker_video_processing.main — src/via_worker_video_processing, tests/)
 frontend/ui/                  Next.js + TypeScript (only npm workspace)
 infrastructure/           Step Functions ASL + Terraform (environments/dev)
 tests/                    Docstring meta-tests (marker `docstring`)
 ```
 
-- **uv workspace** members: `backend/*`, `backend/api`, `backend/agent/service`, `backend/workers/*`. Python `>=3.12,<3.13`.
+- **uv workspace** members: `backend/*`, `backend/api`, `backend/agent/service`, `backend/workers`. Python `>=3.12,<3.13`.
 - **npm workspaces**: `frontend/*` (only `frontend/ui` today). Node `>=22`.
 
 ## Setup & run
@@ -80,8 +80,8 @@ CI order (`ci.yml`): `python-quality` (ruff → format → interrogate → mypy 
 
 - **No agent frameworks** — `langchain`/`langgraph`/`llamaindex`/`crewai` anywhere (manifests or code) fails CI `dependency-policy` job. See `docs/agent-harness.md`.
 - **Docstrings are a hard gate** (not optional): ruff `D` rules (google convention), `interrogate fail-under=100` (`ignore-init-method=true`), pytest `tests/test_docstrings.py` + `test_docstring_validity.py` (`-m docstring`), and `eslint-plugin-jsdoc` (`require-jsdoc`/`require-description` error). Fix them, don't suppress.
-- **Ruff**: `target-version py312`, `line-length 100`, `src = ["backend","tests"]`. `B008` ignored only in `backend/agent/service/src/via_agent/main.py` and `backend/workers/video-processing-worker/src/via_worker_video_processing/main.py` (FastAPI DI).
-- **mypy `strict=true` + `pydantic.mypy`**, `warn_unreachable=true`. Test modules (`backend.*.tests`) relax `disallow_untyped_defs` etc. (see `pyproject.toml`). Production typecheck is `uv run mypy backend/db/src backend/api/src backend/agent/harness/src backend/agent/observability/src backend/agent/prompts/src backend/agent/tools/src backend/agent/service/src backend/workers/video-processing-worker/src tests`.
+- **Ruff**: `target-version py312`, `line-length 100`, `src = ["backend","tests"]`. `B008` ignored only in `backend/agent/service/src/via_agent/main.py` and `backend/workers/src/via_worker_video_processing/main.py` (FastAPI DI).
+- **mypy `strict=true` + `pydantic.mypy`**, `warn_unreachable=true`. Test modules (`backend.*.tests`) relax `disallow_untyped_defs` etc. (see `pyproject.toml`). Production typecheck is `uv run mypy backend/db/src backend/api/src backend/agent/harness/src backend/agent/observability/src backend/agent/prompts/src backend/agent/tools/src backend/agent/service/src backend/workers/src tests`.
 - **pytest** from repo root (`testpaths = ["backend","tests"]`, `import-mode=importlib`, `filterwarnings=error`, `asyncio_mode=auto`). Moto emulates DynamoDB/S3; no AWS creds needed (`AWS_*=test` locally). Fresh `uv` sync needs `uv sync --all-packages`.
 - **Prettier** `printWidth 88`, `uv.lock` + `package-lock.json` ignored (`.prettierignore`); use `make format` (ruff fix+format + prettier).
 - **`X-User-Id` header** is the v0.1 auth seam (prod will be IAM/Cognito/OIDC). Smoke and API tests use it explicitly.

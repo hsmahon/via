@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from via_db import InvalidTransition, VideoNotFound, VideoRepository, VideoStatus
 
 from via_worker_video_processing.events import parse_video_id
-from via_worker_video_processing.processing import analyze_with_pegasus, transcribe
+from via_worker_video_processing.pegasus import PegasusAnalysis, analyze_with_pegasus
+from via_worker_video_processing.transcribe import TranscriptionResult, transcribe
 
 logger = logging.getLogger("via.worker")
 
@@ -28,23 +31,24 @@ def handle_object_created(
     key: str,
     repository: VideoRepository,
     hooks_enabled: bool = False,
+    transcribe_fn: Callable[..., TranscriptionResult] | None = None,
+    analyze_fn: Callable[..., PegasusAnalysis] | None = None,
 ) -> HandlerOutcome:
     """Drive UPLOADING → PROCESSING → PROCESSED for an uploaded object.
 
-    The ``UPLOADING → PROCESSING`` transition is performed as an atomic
-    DynamoDB conditional update (``status = UPLOADING``). Duplicate
-    deliveries therefore fail the condition and are treated as safely
-    handled rather than retried.
-
-    Unknown videos and non-video keys are ignored (acknowledged without
-    action) so replayed or unrelated events never wedge the pipeline.
+    Dependency boundaries for external processing are exposed via
+    ``transcribe_fn`` and ``analyze_fn``. Production code uses the
+    default :func:`transcribe` / :func:`analyze_with_pegasus` (deterministic
+    mocks in V0.1, real AWS calls in V0.2). Tests inject mocked callables
+    to verify orchestration and failure handling without AWS.
 
     Args:
         bucket: S3 bucket containing the object.
         key: S3 object key (``videos/<user>/<video>/<file>``).
         repository: Video repository for state transitions.
-        hooks_enabled: When True, invoke the pending Transcribe/Pegasus
-            interfaces; their NotImplementedError marks the video FAILED.
+        hooks_enabled: When True, kick off Transcribe and Pegasus.
+        transcribe_fn: Optional override for :func:`transcribe` (tests).
+        analyze_fn: Optional override for :func:`analyze_with_pegasus` (tests).
 
     Returns:
         Structured outcome describing what happened.
@@ -62,10 +66,15 @@ def handle_object_created(
         return HandlerOutcome(status="ignored", video_id=video_id, detail=str(exc))
 
     if hooks_enabled:
+        _transcribe: Callable[..., Any] = transcribe_fn if transcribe_fn is not None else transcribe
+        _analyze: Callable[..., Any] = (
+            analyze_fn if analyze_fn is not None else analyze_with_pegasus
+        )
         try:
-            transcribe(bucket=bucket, key=key)
-            analyze_with_pegasus(bucket=bucket, key=key)
-        except NotImplementedError as exc:
+            _transcribe(bucket=bucket, key=key)
+            _analyze(bucket=bucket, key=key)
+        except Exception as exc:
+            logger.warning("processing hooks failed for video %s: %s", video_id, exc)
             failed = repository.update_status(video_id, VideoStatus.FAILED)
             return HandlerOutcome(status="failed", video_id=failed.video_id, detail=str(exc))
 

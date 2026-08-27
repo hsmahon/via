@@ -18,7 +18,7 @@ flowchart TB
     API -->|presigned PUT| S3
     API <-->|state| DDB
 
-    S3 -->|"object created event\n(EventBridge in prod,\nwebhook locally)"| Worker["video-processing-worker"]
+    S3 -->|"object created event\n(EventBridge in prod,\nwebhook locally)"| Worker["workers (video processing)"]
     Worker <-->|state transitions| DDB
     Worker -.->|v0.2: Transcribe| T[Amazon Transcribe]
     Worker -.->|v0.2: Pegasus| P[TwelveLabs Pegasus\nvia Amazon Bedrock]
