@@ -1,3 +1,9 @@
+/**
+ * 3-pane workstation shell that owns the collapsible sidebar state and grid layout.
+ * Exports `Shell` and `ShellProps` (`left`/`center`/`right`/`children` slots) and toggles `60px`↔`240px` via `gridTemplateColumns` while persisting `via:sidebar-collapsed` in `localStorage` (controlled vs uncontrolled).
+ * Depends on `Sidebar` for the left rail and `globals.css` `.shell` tokens; composed by `page.tsx` to host `Library` / `VideoWorkspace` / `AgentPane`.
+ */
+
 "use client";
 
 import React, { useEffect, useState } from "react";

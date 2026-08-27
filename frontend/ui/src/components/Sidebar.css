@@ -1,3 +1,7 @@
+/* Workstation sidebar rail styling — hard-edged, token-driven, no radius.
+   Defines `.sidebar` column flex, `.sidebar-top` 48px bar, `nav button`/`button.nav-active` rows, and `.sidebar-bottom` profile slot using `var(--panel)`, `var(--border)`, and `var(--panel-2)` from `globals.css`.
+   Consumed only by `Sidebar.tsx`; widths are set inline (60/240px) while borders/padding live here to keep JS and CSS responsibilities separate. */
+
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -38,19 +42,19 @@
   padding: 12px 8px;
 }
 
-.sidebar nav a {
+.sidebar nav button {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
   font-size: 13px;
   color: var(--muted);
-  text-decoration: none;
   border: 1px solid transparent;
-  cursor: pointer;
+  width: 100%;
+  text-align: left;
 }
 
-.sidebar nav a.nav-active {
+.sidebar nav button.nav-active {
   color: var(--text);
   background: var(--panel-2);
   border-color: var(--border);

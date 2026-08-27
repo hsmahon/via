@@ -1,10 +1,16 @@
+/**
+ * Collapsible workstation sidebar rail with hard-edged boxy styling.
+ * Exports `Sidebar` and `SidebarProps` (`collapsed`, `onToggle`) rendering VIA logo, Expand/Collapse button (`aria-label`, `title="Library"` tooltip), Library nav (`aria-label="Library nav"`), and bottom Profile slot with `data-collapsed` and `60px`/`240px` widths.
+ * Styled by `Sidebar.css` (`border-right:1px solid var(--border)`) and owned by `Shell`; pure presentational, no storage access.
+ */
+
 "use client";
 
 import React from "react";
 import "./Sidebar.css";
 
 /**
- * Props for the collapsible sidebar.
+ * Props for the collapsible sidebar rail; `collapsed` drives 60/240px width and `onToggle` is wired to the Expand/Collapse button.
  */
 export interface SidebarProps {
   /** Whether the sidebar is in collapsed (icon-only) state. */
@@ -35,20 +41,29 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
     >
       <div className="sidebar-top">
         <span className="logo">VIA</span>
-        <button aria-label={collapsed ? "Expand" : "Collapse"} onClick={onToggle}>
+        <button
+          type="button"
+          aria-label={collapsed ? "Expand" : "Collapse"}
+          onClick={onToggle}
+        >
           {collapsed ? "›" : "‹"}
         </button>
       </div>
       <nav aria-label="Library nav">
-        <a className="nav-active" title="Library">
+        <button
+          type="button"
+          className="nav-active"
+          title="Library"
+          aria-current="page"
+        >
           {collapsed ? (
-            "◧"
+            <span aria-hidden="true">◧</span>
           ) : (
             <>
-              <span aria-hidden>◧</span> <span>Library</span>
+              <span aria-hidden="true">◧</span> <span>Library</span>
             </>
           )}
-        </a>
+        </button>
       </nav>
       <div className="sidebar-bottom">
         <span>{collapsed ? "•" : "Profile"}</span>
