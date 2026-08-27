@@ -1,4 +1,10 @@
-"""Video lifecycle routes."""
+"""Video lifecycle routes for creation, listing, retrieval and playback.
+
+Exposes CRUD over ``/videos`` plus ``GET /{id}/stream`` which issues
+presigned GET URLs via :class:`Presigner`. Ownership is enforced through
+``X-User-Id`` and DynamoDB records, delegating persistence to
+:class:`VideoRepository` and URL signing to the storage layer.
+"""
 
 from __future__ import annotations
 
@@ -124,6 +130,43 @@ def list_videos(
     """
     items = repo.list_by_user(user_id, limit=limit)
     return VideoListResponse(items=[_to_response(r) for r in items], count=len(items))
+
+
+@router.get("/{video_id}/stream", summary="Get presigned playback URL")
+def get_stream(
+    video_id: str,
+    repo: Annotated[VideoRepository, Depends(get_video_repository)],
+    user_id: Annotated[str, Depends(user_id_header)],
+) -> dict[str, object]:
+    """Return a presigned GET URL for video playback.
+
+    Validates ownership before issuing a short-lived URL against the stored
+    ``s3_key``. Uses the dual-client :class:`Presigner` so the URL embeds
+    the public endpoint for browsers while SDK calls target the internal
+    endpoint.
+
+    Args:
+        video_id: Target video.
+        repo: Video repository.
+        user_id: Acting user; must own the video.
+
+    Returns:
+        Dictionary with ``url`` and ``expires_in_seconds``.
+
+    Raises:
+        HTTPException: 401 unauthenticated, 403 non-owner, 404 unknown or
+            missing object key.
+    """
+    record = repo.get(video_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="video not found")
+    if record.user_id != user_id:
+        raise HTTPException(status_code=403, detail="not your video")
+    if not record.s3_key:
+        raise HTTPException(status_code=404, detail="video has no object")
+    presigner = get_presigner(get_settings())
+    url = presigner.create_download_url(key=record.s3_key)
+    return {"url": url, "expires_in_seconds": get_settings().presign_expiry_seconds}
 
 
 @router.get("/{video_id}", response_model=VideoResponse, summary="Get one video")

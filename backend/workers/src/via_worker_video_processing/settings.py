@@ -1,4 +1,10 @@
-"""Typed settings for the video-processing worker."""
+"""Typed settings for the video-processing worker.
+
+Provides :class:`WorkerSettings` with ``VIA_``-prefixed environment bindings
+for table name, DynamoDB endpoint, and processing mode flags. Validates
+empty-string endpoints to ``None`` and coerces ``processing_hooks_enabled`` /
+``processing_mode`` for deterministic local runs.
+"""
 
 from __future__ import annotations
 
@@ -19,15 +25,11 @@ class WorkerSettings(BaseSettings):
     log_level: str = "INFO"
     table_name: str = "via"
     dynamodb_endpoint_url: str | None = None
-    #: When true, invoke Transcribe/Pegasus hooks. ``VIA_PROCESSING_MODE``
-    #: selects the implementation (``mock`` vs ``aws``). Keeping this flag
-    #: allows ``VIA_PROCESSING_HOOKS_ENABLED=true`` to keep working as
-    #: ``mode=mock``.
     processing_hooks_enabled: bool = False
-    #: Processing implementation selector. ``off`` means no hooks,
-    #: ``mock`` uses deterministic in-memory adapters, ``aws`` uses the
-    #: real Transcribe/Bedrock stubs (raise NotImplementedError until v0.2).
+    """When true, invoke Transcribe/Pegasus hooks. ``VIA_PROCESSING_MODE`` selects the implementation (``mock`` vs ``aws``). Keeping this flag allows ``VIA_PROCESSING_HOOKS_ENABLED=true`` to keep working as ``mode=mock``."""
+
     processing_mode: Literal["off", "mock", "aws"] = "off"
+    """Processing implementation selector. ``off`` means no hooks, ``mock`` uses deterministic in-memory adapters, ``aws`` uses the real Transcribe/Bedrock stubs (raise NotImplementedError until v0.2)."""
 
     @field_validator("dynamodb_endpoint_url", mode="before")
     @classmethod

@@ -41,7 +41,23 @@ flowchart TB
 
 Detailed agent runtime design: [agent-harness.md](agent-harness.md).
 Local development walkthrough: [local-development.md](local-development.md).
-API reference: [api.md](api.md).
+API reference: [api.md](api.md) — including `GET /videos/{id}/stream`
+for presigned playback.
+
+## API endpoints (excerpt)
+
+| Method   | Path                         | Description                                                                                                                                                         |
+| -------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST`   | `/videos`                    | Create `UPLOADING` record and return presigned PUT `{url, method, expires_in_seconds}`.                                                                             |
+| `GET`    | `/videos`                    | List acting user's videos newest-first (`limit` 1–100).                                                                                                             |
+| `GET`    | `/videos/{id}`               | Fetch one video by id (404 if missing).                                                                                                                             |
+| `GET`    | `/videos/{id}/stream`        | Return presigned GET `{url, expires_in_seconds}` for browser `<video>` playback; enforces ownership via `X-User-Id` before presigning and issues a short-lived URL. |
+| `DELETE` | `/videos/{id}`               | Soft-delete to `DELETED` with ownership and transition checks.                                                                                                      |
+| `POST`   | `/agent/invoke`              | Video-grounded chat via harness `AgentRunner` (`message`, `video_id`, optional `session_id`/`prompt_name`).                                                         |
+| `GET`    | `/agent/runs/{run_id}/trace` | Debug trace for local tracer runs.                                                                                                                                  |
+| `GET`    | `/health`                    | Liveness for API / worker / agent (`/health`).                                                                                                                      |
+
+`GET /videos/{id}/stream` returns `{url, expires_in_seconds}` for short-lived browser playback. It enforces ownership by checking the `X-User-Id` header against the video's stored owner and derives the S3 key from `s3_key`/`s3_bucket`, rejecting cross-user requests with `403`/`404`. The presigned URL expires quickly (900s) so clients fetch it on selection and inject it into `<video src>`.
 
 ## Request flows
 
