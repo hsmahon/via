@@ -76,6 +76,7 @@ function formatTs(seconds: number): string {
  * @param root0.onSend - Send callback.
  * @param root0.disabled - Disable flag.
  * @param root0.onSeek - Citation seek callback.
+ * @param root0.currentTime - Current playback time in seconds.
  * @returns The agent pane element.
  */
 export default function AgentPane({

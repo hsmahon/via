@@ -65,7 +65,7 @@ export interface VideoWorkspaceProps {
  * @param root0.video - Selected video or null.
  * @param root0.src - Presigned stream URL or null.
  * @param root0.onTimeUpdate - Time update callback.
- * @param root0.onSeek - Optional seek callback.
+ * @param root0.seekTo - Seek target in seconds.
  * @param root0.error - Optional error message.
  * @param root0.onRetry - Optional retry callback.
  * @returns The workspace element.
