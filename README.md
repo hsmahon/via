@@ -7,7 +7,7 @@ understands it.
 | ------------------ | ----------------------------------------------------------------------------------------------------------------- |
 | API service        | FastAPI (`backend/api`)                                                                                           |
 | Agent runtime      | Via-owned harness, zero framework deps (`backend/agent/harness`) + thin FastAPI wrapper (`backend/agent/service`) |
-| Processing worker  | event-driven state machine (`backend/workers` — `src/via_worker_video_processing`, `tests/`)                         |
+| Processing worker  | event-driven state machine (`backend/workers` — `src/via_worker_video_processing`, `tests/`)                      |
 | UI                 | Next.js + TypeScript (`frontend/ui`)                                                                              |
 | State              | DynamoDB single table (DynamoDB Local in dev)                                                                     |
 | Storage            | S3 (MinIO in dev), direct presigned uploads                                                                       |
