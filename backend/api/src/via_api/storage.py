@@ -13,10 +13,12 @@ __all__ = ["Presigner"]
 class Presigner:
     """Issues short-lived PUT URLs for video uploads.
 
-    Uses two endpoint settings: SDK calls run against the internal
-    ``s3_endpoint_url`` (container network), while presigned URLs embed the
+    Optional endpoint overrides for testing (LocalStack); when both
+    ``s3_endpoint_url`` and ``s3_public_endpoint_url`` are ``None``, uses
+    real S3. When set, SDK calls run against the internal
+    ``s3_endpoint_url`` (container network) while presigned URLs embed the
     public ``s3_public_endpoint_url`` so browsers on the host can complete
-    the upload. In production both are unset (real S3).
+    the upload.
     """
 
     def __init__(
@@ -33,8 +35,10 @@ class Presigner:
         Args:
             bucket: Target bucket for uploads.
             region: AWS region for signature.
-            endpoint_url: Internal S3-compatible endpoint, if any.
-            public_endpoint_url: Endpoint embedded into generated URLs.
+            endpoint_url: Optional S3 endpoint override for testing
+                (LocalStack); ``None`` uses real S3.
+            public_endpoint_url: Optional endpoint embedded into generated
+                URLs (LocalStack); ``None`` reuses the primary client.
             expiry_seconds: Lifetime of issued URLs.
         """
         self._bucket = bucket
@@ -77,7 +81,8 @@ def _make_client(*, region: str, endpoint_url: str | None) -> S3Client:
 
     Args:
         region: AWS region.
-        endpoint_url: Optional S3-compatible endpoint override.
+        endpoint_url: Optional endpoint override for testing (LocalStack);
+            ``None`` uses real S3.
 
     Returns:
         Configured boto3 S3 client.

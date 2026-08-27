@@ -21,8 +21,10 @@ class Settings(BaseSettings):
     table_name: str = "via"
     bucket: str = "via-videos"
     dynamodb_endpoint_url: str | None = None
+    #: Optional S3 endpoint override for testing (LocalStack); None uses real S3.
     s3_endpoint_url: str | None = None
-    #: Endpoint embedded in presigned URLs; must be reachable by the CLIENT.
+    #: Optional public endpoint embedded in presigned URLs (LocalStack);
+    #: must be reachable by the client; None uses real S3 / reuses primary client.
     s3_public_endpoint_url: str | None = None
     presign_expiry_seconds: int = 900
     default_user_id: str = "dev-user"
