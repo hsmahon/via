@@ -1,0 +1,188 @@
+/* Right-rail agent pane styling — dark workstation chat with streaming dot and citation pills.
+   Defines `.agent-pane` flex column (`border-left:1px solid var(--border)`, `background:var(--panel)`), `.agent-header` top bar with `VIA Agent` title, `.dot`/`.dot.streaming` green pulse (`var(--accent)` + `@keyframes pulse`), `.agent-messages` scroll stack, `.msg.role-user` right-aligned dark (`var(--panel-2)`) vs `.msg.role-assistant` panel, `.cite` green citation pill (`var(--accent-weak)` + `var(--accent)` border), and `.agent-input` textarea + send button row.
+   Consumed only by `AgentPane.tsx`; tokens come from `globals.css` (`--bg`, `--panel`, `--panel-2`, `--border`, `--text`, `--muted`, `--accent`, `--accent-weak`, `--accent-hover`) and stays boxy with `border-radius:0`. */
+
+.agent-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  border-left: 1px solid var(--border);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.agent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.agent-header-title {
+  color: var(--text);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  display: inline-block;
+  flex-shrink: 0;
+  background: var(--muted-2);
+}
+
+.dot.streaming {
+  background: var(--accent);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 var(--accent-ring);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 0 6px transparent;
+  }
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.agent-messages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.agent-empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 12px 0;
+}
+
+.msg {
+  max-width: 85%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.role-user {
+  align-self: flex-end;
+  background: var(--panel-2);
+  color: var(--text);
+  text-align: right;
+}
+
+.role-assistant {
+  align-self: flex-start;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.msg-citations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cite {
+  border: 1px solid var(--accent);
+  background: var(--accent-weak);
+  color: var(--accent);
+  border-radius: 0;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cite:hover {
+  background: rgba(46, 204, 113, 0.15);
+  border-color: var(--accent-hover);
+  color: var(--accent-hover);
+}
+
+.cite:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.agent-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.agent-input {
+  flex: 1;
+  min-height: 36px;
+  max-height: 96px;
+  resize: none;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: 0;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.agent-input::placeholder {
+  color: var(--muted);
+}
+
+.agent-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+.agent-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.agent-send {
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: 0;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.agent-send:hover {
+  border-color: var(--border-strong);
+}
+
+.agent-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
