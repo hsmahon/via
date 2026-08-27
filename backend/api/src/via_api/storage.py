@@ -1,4 +1,10 @@
-"""S3 presigned upload URLs for the direct client-to-storage flow."""
+"""S3 presigned URLs for the direct browser-to-storage flow.
+
+Provides :class:`Presigner` which issues short-lived PUT targets for uploads
+and presigned GET URLs for playback. Keeps dual boto3 clients so SDK calls
+use an internal endpoint while presigned URLs embed a public endpoint for
+browsers, falling back to real S3 when overrides are unset.
+"""
 
 from __future__ import annotations
 
@@ -75,6 +81,21 @@ class Presigner:
         )
         return {"url": url, "method": "PUT", "expires_in_seconds": self._expiry}
 
+    def create_download_url(self, *, key: str) -> str:
+        """Generate a presigned GET URL for video playback.
+
+        Args:
+            key: S3 object key to fetch.
+
+        Returns:
+            Presigned URL string expiring after ``expiry_seconds``.
+        """
+        return self._public_client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": self._bucket, "Key": key},
+            ExpiresIn=self._expiry,
+        )
+
 
 def _make_client(*, region: str, endpoint_url: str | None) -> S3Client:
     """Build an S3 client for signing or transfer.
@@ -85,8 +106,14 @@ def _make_client(*, region: str, endpoint_url: str | None) -> S3Client:
             ``None`` uses real S3.
 
     Returns:
-        Configured boto3 S3 client.
+        Configured boto3 S3 client with SigV4 signing for presigned URLs.
     """
     import boto3
+    from botocore.config import Config
 
-    return boto3.client("s3", region_name=region, endpoint_url=endpoint_url or None)
+    return boto3.client(
+        "s3",
+        region_name=region,
+        endpoint_url=endpoint_url or None,
+        config=Config(signature_version="s3v4"),
+    )
