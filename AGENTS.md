@@ -32,11 +32,11 @@ make logs        # tail compose logs
 
 All env vars use `VIA_` prefix — see `.env.example`. Key quirk:
 
-- **Two S3 endpoints**: `VIA_S3_ENDPOINT_URL` (server-side SDK inside containers, e.g. `http://minio:9000`) vs `VIA_S3_PUBLIC_ENDPOINT_URL` (embedded in presigned URLs, must be reachable from host/browser, e.g. `http://localhost:9000`). In prod both unset. `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` must look like AWS creds for signing.
+- **Two S3 endpoints** (optional overrides, unset for real S3): `VIA_S3_ENDPOINT_URL` (server-side SDK inside containers, e.g. `http://localhost:4566` for LocalStack) vs `VIA_S3_PUBLIC_ENDPOINT_URL` (embedded in presigned URLs, must be reachable from host/browser). In prod both unset.
 
-Local endpoints: UI 3000, API 8080 (`/docs`), agent 8081, worker 8082 (`/health`), MinIO 9000/9001, DynamoDB Local 8005→8000.
+Local endpoints: UI 3000, API 8080 (`/docs`), agent 8081, worker 8082 (`/health`), DynamoDB Local 8005→8000.
 
-- Stuck in `UPLOADING`: worker unhealthy or webhook misconfigured — `docker compose ps` then `docker compose up minio-init`.
+- Stuck in `UPLOADING`: worker unhealthy — `docker compose ps` and check `worker:8082/health`.
 - `VIA_PROCESSING_HOOKS_ENABLED=false` by default — when `true`, Transcribe/Pegasus hooks raise `NotImplementedError` → video → `FAILED` (intentional seam until v0.2).
 - Emulators are in-memory; `docker compose down && docker compose up --build` resets everything.
 
@@ -70,7 +70,7 @@ CI order (`ci.yml`): `python-quality` (ruff → format → interrogate → mypy 
 - **Single DynamoDB table** (`pk`/`sk`, `gsi1: USER#<user_id>` → `<created_at>#<video_id>`). Single `via-table` contract: `VIDEO#<id>/META` only; GSI `gsi1` serves `GET /videos`. Transitions enforced in `backend/db` — invalid → `InvalidTransition`.
 - **Status lifecycle**: `UPLOADING → PROCESSING → PROCESSED → DELETED`; `UPLOADING/PROCESSING → FAILED → DELETED` (see `docs/architecture.md`).
 - **Upload is direct browser→S3** via presigned PUT; API never proxies bytes.
-- **Object-created event** normalized to one envelope: locally MinIO webhook `POST /events/minio` on `worker:8082` (prod: S3 → EventBridge → Step Functions). `dynamodb-local` started with `-sharedDb -inMemory`; `dynamodb-init` runs `via_db.bootstrap`, `minio-init` creates bucket + webhook.
+- **Object-created event** normalized to one envelope: S3 → EventBridge → `POST /events` on `worker:8082` → Step Functions. `dynamodb-local` started with `-sharedDb -inMemory`; `dynamodb-init` runs `via_db.bootstrap`.
 - **Harness is Via-owned, not a framework**: `AgentRunner.execute()` + ports `ModelClient/PromptResolver/ToolRegistry/Authorizer/Tracer`. Local impls: `LocalModelClient`, `FilePromptResolver`, `InProcessToolRegistry`, `LocalTracer`; prod swaps in `wiring.py` only. Domain logic lives under `backend/*`; services are thin FastAPI wrappers.
 - **Tool contract** (`backend/agent/tools/…/base.py::ToolContract`) mandates permission + DynamoDB ownership check; denial aborts run with `AUTHORIZATION_ERROR` (never leaked to model). New tool: class with `ToolContract` in `backend/agent/tools/src/via_tools/implementations/` + register in `build_default_registry`.
 - **Prompts are immutable `(name, version, environment)` YAML triples** under `backend/agent/prompts/src/via_prompts/prompts/<name>/v<N>.yaml`; missing/unexpected variables → `INVALID_REQUEST`.
